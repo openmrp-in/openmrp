@@ -141,6 +141,79 @@ describe('routes (integration, real D1)', () => {
   })
 })
 
+describe('bulk upsert (seeding)', () => {
+  function bulk(items: unknown[]) {
+    return SELF.fetch(`${BASE}/v1/products/bulk`, {
+      method: 'POST',
+      headers: ADMIN,
+      body: JSON.stringify({ items }),
+    })
+  }
+
+  it('inserts new items and dedupes a repeated brand within the batch', async () => {
+    const res = await bulk([
+      { barcode: '5000000000001', name: 'A', brand: 'AcmeFoods', pack_size: 100, unit: 'g', food_type: 'veg', group_key: 'g1' },
+      { barcode: '5000000000002', name: 'B', brand: 'AcmeFoods' },
+    ])
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ ok: true, inserted: 2, refreshed: 0, skipped: 0, invalid: 0 })
+  })
+
+  it('refreshes an off variant on re-seed and upserts an existing brand', async () => {
+    expect(await (await bulk([{ barcode: '5000000000003', name: 'C', brand: 'BrandX' }])).json()).toMatchObject({ inserted: 1 })
+    expect(await (await bulk([{ barcode: '5000000000003', name: 'C', brand: 'BrandX', pack_size: 250 }])).json()).toMatchObject({ inserted: 0, refreshed: 1 })
+    // new barcode, brand already in DB (cache empty in this fresh call) -> upsert existing
+    expect(await (await bulk([{ barcode: '5000000000004', name: 'D', brand: 'BrandX' }])).json()).toMatchObject({ inserted: 1 })
+  })
+
+  it('skips a shop-improved (non-off) variant', async () => {
+    const created = await SELF.fetch(`${BASE}/v1/products`, { method: 'POST', headers: ADMIN, body: productBody('5000000000005') })
+    expect(created.status).toBe(201)
+    expect(await (await bulk([{ barcode: '5000000000005', name: 'Override', brand: 'Y' }])).json()).toMatchObject({ inserted: 0, skipped: 1 })
+  })
+
+  it('counts invalid items and inserts the valid ones', async () => {
+    const res = await bulk([{ name: 'NoBarcode' }, { barcode: '5000000000006' }, { barcode: '5000000000007', name: 'Valid', brand: 'Z' }])
+    expect(await res.json()).toMatchObject({ inserted: 1, invalid: 2 })
+  })
+
+  it('inserts an item with no brand', async () => {
+    expect(await (await bulk([{ barcode: '5000000000008', name: 'NoBrand', group_key: 'gnb' }])).json()).toMatchObject({ inserted: 1 })
+  })
+
+  it('rejects without an admin key → 401', async () => {
+    const res = await SELF.fetch(`${BASE}/v1/products/bulk`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ items: [] }),
+    })
+    expect(res.status).toBe(401)
+  })
+
+  it('rejects a wrong admin key → 401', async () => {
+    const res = await SELF.fetch(`${BASE}/v1/products/bulk`, {
+      method: 'POST',
+      headers: { 'X-Admin-Key': 'wrong', 'content-type': 'application/json' },
+      body: JSON.stringify({ items: [] }),
+    })
+    expect(res.status).toBe(401)
+  })
+
+  it('rejects invalid JSON → 400', async () => {
+    const res = await SELF.fetch(`${BASE}/v1/products/bulk`, { method: 'POST', headers: ADMIN, body: 'nope' })
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects an empty items array → 422', async () => {
+    expect((await bulk([])).status).toBe(422)
+  })
+
+  it('rejects a null body → 422', async () => {
+    const res = await SELF.fetch(`${BASE}/v1/products/bulk`, { method: 'POST', headers: ADMIN, body: 'null' })
+    expect(res.status).toBe(422)
+  })
+})
+
 describe('OFF fallback (network mocked)', () => {
   beforeAll(() => {
     fetchMock.activate()

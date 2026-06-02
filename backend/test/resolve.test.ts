@@ -47,6 +47,7 @@ function makeStore(byBarcode: ResolvedProduct | null): ProductStore {
     createProduct: async () => {
       throw new Error('not used in this test')
     },
+    bulkUpsert: async () => ({ inserted: 0, refreshed: 0, skipped: 0 }),
   }
 }
 
