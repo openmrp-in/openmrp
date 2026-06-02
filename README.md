@@ -69,11 +69,24 @@ The ODbL data license is **irrevocable** — the data is, and always will be, op
   [GOVERNANCE.md](GOVERNANCE.md).
 - **Everyone** — suggest a product, correct a detail, or flag a wrong MRP.
 
+## Repository structure
+
+```
+openmrp/
+├── backend/    # API — Cloudflare Workers + D1 (TypeScript). Barcode resolve + write API.
+├── frontend/   # Public site — Cloudflare Pages (Next.js/Astro). Coming soon.
+└── dump/       # ODbL open-data exports (JSONL/CSV) + tooling. Coming soon.
+```
+
+Each folder is an independent project with its own `package.json`. See each folder's
+README for status and details.
+
 ## Status
 
 🚧 **Early / pre-build.** Identity and design are set; the platform is being built.
 Planned architecture: Cloudflare Workers + D1 + R2 + Pages (TypeScript), with the open
-dataset versioned here on GitHub.
+dataset versioned here on GitHub. The `backend/` Phase 0 core (barcode resolve + admin
+write + OFF fallback) is the first slice.
 
 ## Governance & stewardship
 

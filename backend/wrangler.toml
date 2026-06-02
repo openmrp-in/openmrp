@@ -1,0 +1,18 @@
+name = "openmrp"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# D1 database binding. For local dev, wrangler uses a local SQLite file and the
+# database_id is ignored. Before deploying, run:  wrangler d1 create openmrp
+# then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "openmrp"
+database_id = "REPLACE_AFTER_wrangler_d1_create"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true
+
+# ADMIN_KEY is a secret, not set here. Local: copy .dev.vars.example -> .dev.vars.
+# Production:  wrangler secret put ADMIN_KEY
