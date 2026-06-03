@@ -1,0 +1,152 @@
+---
+import { getProduct, rupees, foodTypeLabel } from '../../lib/api'
+
+const { barcode = '' } = Astro.params
+const result = await getProduct(barcode)
+const product = result.product
+const variants = result.variants ?? []
+const names = result.names ?? []
+const suggestion = result.off_suggestion
+
+if (!result.found) Astro.response.status = 404
+
+const displayName = product?.name ?? suggestion?.name ?? `Barcode ${barcode}`
+const pageTitle = result.found ? `${displayName} — OpenMRP` : `Barcode ${barcode} — OpenMRP`
+const description = result.found
+  ? `${displayName}: pack sizes, MRP, veg/non-veg and details. Free, open product data for India.`
+  : `No product yet for barcode ${barcode}. OpenMRP — free, open product data for India.`
+
+const mrps = variants.map((v) => v.mrp_paise).filter((p) => p > 0)
+const lowestMrp = mrps.length > 0 ? Math.min(...mrps) : 0
+const canonical = `https://openmrp.in/p/${barcode}`
+
+const jsonLd = product
+  ? {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: displayName,
+      gtin: barcode,
+      ...(product.category ? { category: product.category } : {}),
+      ...(lowestMrp > 0
+        ? { offers: { '@type': 'Offer', priceCurrency: 'INR', price: (lowestMrp / 100).toFixed(2) } }
+        : {}),
+    }
+  : null
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <link rel="canonical" href={canonical} />
+    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #1a1a1a; background: #f7f7f5; }
+      header { background: #fff; border-bottom: 1px solid #e5e5e2; padding: 14px 20px; }
+      header a { font-weight: 700; color: #0a7d3c; text-decoration: none; font-size: 18px; }
+      main { max-width: 720px; margin: 0 auto; padding: 24px 20px 64px; }
+      .card { background: #fff; border: 1px solid #e5e5e2; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 24px; }
+      .barcode { color: #777; font-size: 13px; letter-spacing: .04em; margin: 0 0 6px; }
+      h1 { font-size: 26px; margin: 0 0 12px; }
+      h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .05em; color: #555; margin: 28px 0 10px; }
+      .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+      .chip { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: #f0f0ee; border: 1px solid #e2e2df; }
+      .chip.veg { background: #e7f6ec; border-color: #b7e0c4; color: #0a7d3c; }
+      .chip.non-veg { background: #fdeaea; border-color: #f3c0c0; color: #b3261e; }
+      .chip.egg { background: #fbf2e3; border-color: #ecd9b0; color: #8a5a00; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #eee; }
+      th { font-size: 13px; color: #777; font-weight: 600; }
+      td.mrp { font-weight: 600; }
+      td.unknown { color: #999; font-weight: 400; }
+      ul.names { list-style: none; padding: 0; margin: 0; }
+      ul.names li { padding: 8px 0; border-bottom: 1px solid #f0f0ee; }
+      .lang { display: inline-block; min-width: 38px; font-size: 12px; color: #777; text-transform: uppercase; }
+      .attribution { margin-top: 28px; font-size: 12px; color: #999; }
+      footer { text-align: center; color: #999; font-size: 13px; padding: 24px; }
+      .notfound { text-align: center; }
+    </style>
+  </head>
+  <body>
+    <header><a href="/">OpenMRP</a></header>
+    <main>
+      {
+        result.found && product ? (
+          <article class="card">
+            <p class="barcode">Barcode {barcode}</p>
+            <h1>{displayName}</h1>
+            <div class="chips">
+              {product.food_type !== 'none' && (
+                <span class={`chip ${product.food_type}`}>{foodTypeLabel(product.food_type)}</span>
+              )}
+              {product.category && <span class="chip">{product.category}</span>}
+            </div>
+
+            <h2>Pack sizes &amp; MRP</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Pack</th>
+                  <th>MRP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {variants.map((v) => (
+                  <tr>
+                    <td>{v.label || (v.pack_size ? `${v.pack_size} ${v.unit}`.trim() : '—')}</td>
+                    {v.mrp_paise > 0 ? (
+                      <td class="mrp">{rupees(v.mrp_paise)}</td>
+                    ) : (
+                      <td class="unknown">Not yet known</td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {names.length > 0 && (
+              <Fragment>
+                <h2>Names</h2>
+                <ul class="names">
+                  {names.map((n) => (
+                    <li>
+                      <span class="lang">{n.lang}</span> {n.name}
+                    </li>
+                  ))}
+                </ul>
+              </Fragment>
+            )}
+
+            <p class="attribution">
+              Data from Open Food Facts (ODbL). MRP is community-sourced — confirm on the pack.
+            </p>
+          </article>
+        ) : result.found && suggestion ? (
+          <article class="card">
+            <p class="barcode">Barcode {barcode}</p>
+            <h1>{suggestion.name}</h1>
+            <p>Found on Open Food Facts — not yet in OpenMRP with an MRP.</p>
+            <p class="attribution">Data from Open Food Facts (ODbL).</p>
+          </article>
+        ) : (
+          <article class="card notfound">
+            <h1>Not found</h1>
+            <p>
+              No product yet for barcode <strong>{barcode}</strong>.
+            </p>
+          </article>
+        )
+      }
+    </main>
+    <footer>OpenMRP — free, open product data for India.</footer>
+  </body>
+</html>

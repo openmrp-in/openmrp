@@ -1,0 +1,64 @@
+---
+const title = 'OpenMRP — free, open product data for India'
+const description =
+  'Scan or enter a barcode to see a product’s name, brand, pack size and real MRP. Free, open, community-built. The OpenFoodFacts of India.'
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <link rel="canonical" href="https://openmrp.in/" />
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #1a1a1a; background: #f7f7f5; }
+      header { background: #fff; border-bottom: 1px solid #e5e5e2; padding: 14px 20px; }
+      header a { font-weight: 700; color: #0a7d3c; text-decoration: none; font-size: 18px; }
+      main { max-width: 640px; margin: 0 auto; padding: 64px 20px; text-align: center; }
+      h1 { font-size: 34px; margin: 0 0 12px; }
+      p.tag { color: #555; font-size: 17px; margin: 0 0 32px; }
+      form { display: flex; gap: 8px; max-width: 440px; margin: 0 auto; }
+      input { flex: 1; padding: 14px 16px; font-size: 16px; border: 1px solid #d6d6d2; border-radius: 10px; background: #fff; }
+      input:focus { outline: none; border-color: #0a7d3c; box-shadow: 0 0 0 3px rgba(10,125,60,.15); }
+      button { padding: 14px 22px; font-size: 16px; font-weight: 600; color: #fff; background: #0a7d3c; border: none; border-radius: 10px; cursor: pointer; }
+      button:hover { background: #096a33; }
+      .note { margin-top: 28px; color: #999; font-size: 13px; }
+      footer { text-align: center; color: #999; font-size: 13px; padding: 24px; }
+    </style>
+  </head>
+  <body>
+    <header><a href="/">OpenMRP</a></header>
+    <main>
+      <h1>Know the real MRP.</h1>
+      <p class="tag">
+        Free, open product data for India — barcode &rarr; name, brand, pack size &amp; MRP.
+      </p>
+      <form id="lookup" autocomplete="off">
+        <input
+          id="barcode"
+          name="barcode"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          placeholder="Enter a barcode, e.g. 8901719134845"
+          aria-label="Barcode"
+          required
+        />
+        <button type="submit">Look up</button>
+      </form>
+      <p class="note">Community-built &middot; ODbL open data &middot; 22 Indian languages</p>
+    </main>
+    <footer>OpenMRP — the OpenFoodFacts of India.</footer>
+    <script is:inline>
+      document.getElementById('lookup').addEventListener('submit', (e) => {
+        e.preventDefault()
+        const code = document.getElementById('barcode').value.trim()
+        if (code) window.location.href = '/p/' + encodeURIComponent(code)
+      })
+    </script>
+  </body>
+</html>

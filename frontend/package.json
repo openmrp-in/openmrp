@@ -1,0 +1,19 @@
+{
+  "name": "@openmrp/frontend",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "OpenMRP public website — Astro on Cloudflare Pages",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "astro": "^5.0.0"
+  },
+  "devDependencies": {
+    "@astrojs/cloudflare": "^12.0.0"
+  }
+}
