@@ -1,0 +1,35 @@
+---
+import Base from '../../layouts/Base.astro'
+---
+
+<Base title="Log in — OpenMRP developers" description="Log in to your OpenMRP developer account.">
+  <h1>Log in</h1>
+  <form id="form" class="authform">
+    <input id="email" type="email" placeholder="Email" autocomplete="email" required />
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password" required />
+    <button class="primary" type="submit">Log in</button>
+  </form>
+  <p id="msg" class="msg"></p>
+  <p>No account? <a href="/developers/register">Register</a></p>
+</Base>
+
+<script>
+  import { api, setToken } from '../../client/portal'
+  const form = document.getElementById('form') as HTMLFormElement
+  const msg = document.getElementById('msg') as HTMLElement
+  const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    msg.textContent = 'Logging in…'
+    const res = await api('/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: val('email'), password: val('password') }),
+    })
+    if (res.status === 200) {
+      setToken((await res.json()).token)
+      location.href = '/developers/dashboard'
+    } else {
+      msg.textContent = 'Invalid email or password.'
+    }
+  })
+</script>

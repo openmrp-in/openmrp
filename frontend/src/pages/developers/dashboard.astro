@@ -1,0 +1,73 @@
+---
+import Base from '../../layouts/Base.astro'
+---
+
+<Base title="Developer dashboard — OpenMRP" description="Manage your OpenMRP API keys.">
+  <div id="newkey"></div>
+  <div id="app"><p class="empty">Loading…</p></div>
+</Base>
+
+<script>
+  import { api, getToken, clearToken, esc } from '../../client/portal'
+
+  interface KeyRow { id: string; name: string; prefix: string; request_count: number; revoked: boolean }
+
+  const app = document.getElementById('app') as HTMLElement
+  const newkey = document.getElementById('newkey') as HTMLElement
+  const logout = () => { clearToken(); location.href = '/developers/login' }
+
+  if (!getToken()) logout()
+
+  async function load() {
+    const meRes = await api('/v1/auth/me')
+    if (meRes.status === 401) return logout()
+    const me = await meRes.json()
+    const keys: KeyRow[] = (await (await api('/v1/keys')).json()).keys
+    render(me.email, keys)
+  }
+
+  function render(email: string, keys: KeyRow[]) {
+    const rows = keys
+      .map(
+        (k) => `<tr>
+          <td>${esc(k.name || '—')}</td>
+          <td><code>${esc(k.prefix)}</code></td>
+          <td>${k.request_count}</td>
+          <td>${k.revoked ? '<span class="chip non-veg">revoked</span>' : '<span class="chip veg">active</span>'}</td>
+          <td>${k.revoked ? '' : `<button class="revoke ghost" data-id="${esc(k.id)}">Revoke</button>`}</td>
+        </tr>`,
+      )
+      .join('')
+    app.innerHTML = `
+      <div class="dashhead">
+        <div><h1>Developer dashboard</h1><p class="brandline">${esc(email)}</p></div>
+        <button id="logout" class="ghost">Log out</button>
+      </div>
+      <p><button id="create" class="primary">Create API key</button></p>
+      <h2>Your API keys</h2>
+      ${keys.length === 0 ? '<p class="empty">No keys yet — create one to start calling the API.</p>' : `<table><thead><tr><th>Name</th><th>Prefix</th><th>Requests</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}
+    `
+    ;(document.getElementById('logout') as HTMLElement).onclick = logout
+    ;(document.getElementById('create') as HTMLElement).onclick = createKey
+    document.querySelectorAll<HTMLElement>('.revoke').forEach((b) =>
+      b.addEventListener('click', () => revoke(b.dataset.id as string)),
+    )
+  }
+
+  async function createKey() {
+    const name = prompt('Name for this key (e.g. my-app):')
+    if (name === null) return
+    const res = await api('/v1/keys', { method: 'POST', body: JSON.stringify({ name }) })
+    const k = await res.json()
+    newkey.innerHTML = `<div class="newkey"><strong>Copy your key now — it won't be shown again:</strong><code>${esc(k.key)}</code></div>`
+    await load()
+  }
+
+  async function revoke(id: string) {
+    if (!confirm('Revoke this key? Apps using it will stop working.')) return
+    await api(`/v1/keys/${id}/revoke`, { method: 'POST' })
+    await load()
+  }
+
+  load()
+</script>

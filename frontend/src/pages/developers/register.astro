@@ -1,0 +1,38 @@
+---
+import Base from '../../layouts/Base.astro'
+---
+
+<Base title="Register — OpenMRP developers" description="Create an OpenMRP developer account.">
+  <h1>Create a developer account</h1>
+  <form id="form" class="authform">
+    <input id="name" placeholder="Name (optional)" autocomplete="name" />
+    <input id="email" type="email" placeholder="Email" autocomplete="email" required />
+    <input id="password" type="password" placeholder="Password (8+ characters)" autocomplete="new-password" required />
+    <button class="primary" type="submit">Register</button>
+  </form>
+  <p id="msg" class="msg"></p>
+  <p>Already have an account? <a href="/developers/login">Log in</a></p>
+</Base>
+
+<script>
+  import { api, setToken } from '../../client/portal'
+  const form = document.getElementById('form') as HTMLFormElement
+  const msg = document.getElementById('msg') as HTMLElement
+  const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    msg.textContent = 'Registering…'
+    const res = await api('/v1/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name: val('name'), email: val('email'), password: val('password') }),
+    })
+    if (res.status === 201) {
+      setToken((await res.json()).token)
+      location.href = '/developers/dashboard'
+    } else if (res.status === 409) {
+      msg.textContent = 'That email is already registered.'
+    } else {
+      msg.textContent = 'Registration failed — use a valid email and an 8+ character password.'
+    }
+  })
+</script>

@@ -1,5 +1,6 @@
 import { createRoute } from '@hono/zod-openapi'
 import { Scalar } from '@scalar/hono-api-reference'
+import { cors } from 'hono/cors'
 import { newOpenAPIApp } from './openapi/app'
 import { HealthSchema } from './openapi/schemas'
 import adminApp from './routes/admin'
@@ -10,6 +11,16 @@ import productApp from './routes/product'
 import productsApp from './routes/products'
 
 const app = newOpenAPIApp()
+
+// Public API: allow browsers (the developer portal + any consumer) to call it.
+app.use(
+  '*',
+  cors({
+    origin: '*',
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Api-Key', 'X-Admin-Key'],
+    allowMethods: ['GET', 'POST'],
+  }),
+)
 
 const healthRoute = createRoute({
   method: 'get',

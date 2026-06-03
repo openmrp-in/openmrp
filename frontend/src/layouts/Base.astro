@@ -67,6 +67,18 @@ const { title, description, canonical, jsonLd } = Astro.props
       ul.brandlist a:hover { border-color: #b7e0c4; }
       ul.brandlist .count { color: #999; font-size: 13px; }
       p.empty { color: #777; }
+      form.authform { display: flex; flex-direction: column; gap: 10px; max-width: 360px; margin: 0 0 14px; }
+      form.authform input { padding: 12px 14px; font-size: 15px; border: 1px solid #d6d6d2; border-radius: 10px; }
+      form.authform input:focus { outline: none; border-color: #0a7d3c; box-shadow: 0 0 0 3px rgba(10,125,60,.15); }
+      .primary { padding: 11px 18px; font-size: 15px; font-weight: 600; color: #fff; background: #0a7d3c; border: none; border-radius: 10px; cursor: pointer; }
+      .primary:hover { background: #096a33; }
+      .ghost { padding: 7px 12px; font-size: 13px; color: #555; background: #fff; border: 1px solid #d6d6d2; border-radius: 8px; cursor: pointer; }
+      .ghost:hover { border-color: #0a7d3c; color: #0a7d3c; }
+      .msg { color: #b3261e; font-size: 14px; min-height: 18px; }
+      .dashhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+      .newkey { background: #fbf2e3; border: 1px solid #ecd9b0; border-radius: 10px; padding: 14px; margin: 12px 0; }
+      .newkey code { display: block; margin-top: 8px; word-break: break-all; font-size: 13px; }
+      code { background: #f0f0ee; padding: 2px 6px; border-radius: 6px; font-size: 13px; }
     </style>
   </head>
   <body>
