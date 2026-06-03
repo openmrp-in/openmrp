@@ -1,3 +1,4 @@
 # Local secrets for `wrangler dev`. Copy this file to `.dev.vars` (gitignored).
-# Production secrets are set with: wrangler secret put ADMIN_KEY
+# Production secrets are set with: wrangler secret put <NAME>
 ADMIN_KEY=local-dev-admin-key-change-me
+JWT_SECRET=local-dev-jwt-secret-change-me

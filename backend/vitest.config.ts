@@ -18,6 +18,7 @@ export default defineWorkersConfig(async () => {
             // Bindings used by tests: the admin key + the migrations blob.
             bindings: {
               ADMIN_KEY: 'test-admin-key',
+              JWT_SECRET: 'test-jwt-secret',
               TEST_MIGRATIONS: migrations,
             },
           },

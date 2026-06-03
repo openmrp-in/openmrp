@@ -2,6 +2,8 @@
 export interface Env {
   /** D1 database binding. */
   DB: D1Database
-  /** Shared admin key gating write endpoints (set via `wrangler secret put`). */
+  /** Shared admin/super-admin key (set via `wrangler secret put`). */
   ADMIN_KEY: string
+  /** HMAC secret for signing developer session JWTs. */
+  JWT_SECRET: string
 }

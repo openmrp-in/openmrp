@@ -1,7 +1,6 @@
 import { createRoute } from '@hono/zod-openapi'
 import type { MiddlewareHandler } from 'hono'
-import type { Env } from '../env'
-import { isAdmin, newOpenAPIApp } from '../openapi/app'
+import { isAdmin, newOpenAPIApp, type AppEnv } from '../openapi/app'
 import {
   BulkRequestSchema,
   BulkResponseSchema,
@@ -16,7 +15,7 @@ import { normalizeSeedItem, type SeedItem } from '../lib/seed'
 const app = newOpenAPIApp()
 
 // Admin gate — runs BEFORE request validation, so auth failures are 401 (not 422).
-const adminGuard: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+const adminGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!isAdmin(c)) return c.json({ error: 'unauthorized' }, 401)
   await next()
 }

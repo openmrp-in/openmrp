@@ -7,14 +7,9 @@ import {
   SearchResponseSchema,
 } from '../openapi/schemas'
 import { createD1Store } from '../db/queries'
+import { clampLimit } from '../lib/limit'
 
 const app = newOpenAPIApp()
-
-function clampLimit(raw: string | undefined, def: number, max: number): number {
-  const n = Number(raw)
-  if (!Number.isFinite(n) || n <= 0) return def
-  return Math.min(Math.floor(n), max)
-}
 
 const limitQuery = z.string().optional().openapi({ description: 'Max results (clamped)', example: '30' })
 

@@ -7,8 +7,10 @@ import type { Env } from '../env'
  * failure becomes our standard 422 `{ error: 'validation_failed', details }` shape.
  * Because the Zod schemas ARE the validators AND the OpenAPI spec, docs can't drift.
  */
+export type AppEnv = { Bindings: Env; Variables: { developerId: string } }
+
 export function newOpenAPIApp() {
-  return new OpenAPIHono<{ Bindings: Env }>({
+  return new OpenAPIHono<AppEnv>({
     defaultHook: (result, c) => {
       if (!result.success) {
         return c.json(
@@ -24,7 +26,7 @@ export function newOpenAPIApp() {
 }
 
 /** Admin-key gate for write endpoints. */
-export function isAdmin(c: Context<{ Bindings: Env }>): boolean {
+export function isAdmin(c: Context<AppEnv>): boolean {
   const key = c.req.header('X-Admin-Key')
   return !!key && key === c.env.ADMIN_KEY
 }

@@ -2,7 +2,10 @@ import { createRoute } from '@hono/zod-openapi'
 import { Scalar } from '@scalar/hono-api-reference'
 import { newOpenAPIApp } from './openapi/app'
 import { HealthSchema } from './openapi/schemas'
+import adminApp from './routes/admin'
+import authApp from './routes/auth'
 import discoverApp from './routes/discover'
+import keysApp from './routes/keys'
 import productApp from './routes/product'
 import productsApp from './routes/products'
 
@@ -21,12 +24,20 @@ app.openapi(healthRoute, (c) => c.json({ status: 'ok', service: 'openmrp-backend
 app.route('/', productApp)
 app.route('/', productsApp)
 app.route('/', discoverApp)
+app.route('/', authApp)
+app.route('/', keysApp)
+app.route('/', adminApp)
 
-// Admin-key security scheme (documented on the write endpoints).
+// Security schemes (documented on the relevant endpoints).
 app.openAPIRegistry.registerComponent('securitySchemes', 'AdminKey', {
   type: 'apiKey',
   in: 'header',
   name: 'X-Admin-Key',
+})
+app.openAPIRegistry.registerComponent('securitySchemes', 'DevBearer', {
+  type: 'http',
+  scheme: 'bearer',
+  bearerFormat: 'JWT',
 })
 
 // The spec + an interactive docs UI.

@@ -233,3 +233,84 @@ export const BulkRequestSchema = z
 
 /** The normalized create-product input (Zod output) — the store's input type. */
 export type CreateProductInput = z.infer<typeof CreateProductSchema>
+
+// ─── Developer accounts ──────────────────────────────────────────────────────
+export const RegisterSchema = z
+  .object({
+    email: z.string().trim().min(3).max(255).openapi({ example: 'dev@example.com' }),
+    password: z.string().min(8).max(200),
+    name: z.string().default(''),
+  })
+  .openapi('Register')
+
+export const LoginSchema = z
+  .object({ email: z.string().trim().min(3), password: z.string().min(1) })
+  .openapi('Login')
+
+export const DeveloperViewSchema = z
+  .object({ id: z.string(), email: z.string(), name: z.string(), created_at: z.string() })
+  .openapi('Developer')
+
+export const AuthResponseSchema = z
+  .object({ token: z.string(), developer: DeveloperViewSchema })
+  .openapi('AuthResponse')
+
+// ─── API keys ────────────────────────────────────────────────────────────────
+export const CreateKeySchema = z.object({ name: z.string().default('') }).openapi('CreateKey')
+
+export const ApiKeyViewSchema = z
+  .object({
+    id: z.string(),
+    prefix: z.string(),
+    name: z.string(),
+    revoked: z.boolean(),
+    request_count: z.number(),
+    last_used_at: z.string(),
+    created_at: z.string(),
+  })
+  .openapi('ApiKey')
+
+export const CreatedKeySchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    prefix: z.string(),
+    /** Full plaintext key — shown once, store it now. */
+    key: z.string(),
+    created_at: z.string(),
+  })
+  .openapi('CreatedKey')
+
+export const KeysListSchema = z.object({ keys: z.array(ApiKeyViewSchema) }).openapi('KeysList')
+
+export const RevokeResponseSchema = z.object({ revoked: z.boolean() }).openapi('RevokeResponse')
+
+// ─── Super-admin ─────────────────────────────────────────────────────────────
+export const AdminDeveloperSchema = z
+  .object({
+    id: z.string(),
+    email: z.string(),
+    name: z.string(),
+    key_count: z.number(),
+    created_at: z.string(),
+  })
+  .openapi('AdminDeveloper')
+
+export const AdminDevelopersSchema = z
+  .object({ developers: z.array(AdminDeveloperSchema) })
+  .openapi('AdminDevelopers')
+
+export const AdminKeySchema = z
+  .object({
+    id: z.string(),
+    developer_id: z.string(),
+    prefix: z.string(),
+    name: z.string(),
+    revoked: z.boolean(),
+    request_count: z.number(),
+    last_used_at: z.string(),
+    created_at: z.string(),
+  })
+  .openapi('AdminKey')
+
+export const AdminKeysSchema = z.object({ keys: z.array(AdminKeySchema) }).openapi('AdminKeys')
