@@ -1,5 +1,11 @@
 import type { ProductStore } from '../db/queries'
-import type { ProductNameRow, ProductRow, VariantRow } from '../db/schema'
+import type {
+  BrandRow,
+  BrandTranslationRow,
+  ProductRow,
+  ProductTranslationRow,
+  VariantRow,
+} from '../db/schema'
 import type { OffClient, OffSuggestion } from './off'
 
 export interface ResolveResult {
@@ -7,8 +13,10 @@ export interface ResolveResult {
   /** 'crowd' = our DB · 'off' = Open Food Facts suggestion (no MRP) · 'none' = miss */
   source: 'crowd' | 'off' | 'none'
   product?: ProductRow
+  brand?: BrandRow | null
   variants?: VariantRow[]
-  names?: ProductNameRow[]
+  translations?: ProductTranslationRow[]
+  brand_translations?: BrandTranslationRow[]
   off_suggestion?: OffSuggestion
 }
 
@@ -32,8 +40,10 @@ export async function resolveBarcode(
       found: true,
       source: 'crowd',
       product: crowd.product,
+      brand: crowd.brand,
       variants: crowd.variants,
-      names: crowd.names,
+      translations: crowd.translations,
+      brand_translations: crowd.brand_translations,
     }
   }
 

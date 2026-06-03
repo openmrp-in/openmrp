@@ -9,7 +9,7 @@ function productBody(barcode: string, overrides: Record<string, unknown> = {}) {
     brand: { name: 'Aachi' },
     product: { name: 'Chilli Masala', food_type: 'veg', category: 'Spices' },
     variants: [{ label: '100g', pack_size: 100, unit: 'g', barcode, mrp_paise: 4500 }],
-    names: [{ lang: 'ta', name: 'மிளகாய்' }],
+    translations: [{ lang: 'ta', name: 'மிளகாய்' }],
     ...overrides,
   })
 }
@@ -58,12 +58,12 @@ describe('routes (integration, real D1)', () => {
       created: boolean
       product: { name: string }
       variants: { mrp_paise: number }[]
-      names: { name: string }[]
+      translations: { name: string }[]
     }
     expect(created.created).toBe(true)
     expect(created.product.name).toBe('Chilli Masala')
     expect(created.variants[0].mrp_paise).toBe(4500)
-    expect(created.names[0].name).toBe('மிளகாய்')
+    expect(created.translations[0].name).toBe('மிளகாய்')
 
     const get = await SELF.fetch(`${BASE}/v1/product/${barcode}`)
     expect(get.status).toBe(200)
@@ -71,13 +71,51 @@ describe('routes (integration, real D1)', () => {
       found: boolean
       source: string
       product: { name: string }
+      brand: { name: string } | null
       variants: { barcode: string }[]
-      names: { lang: string }[]
+      translations: { lang: string }[]
     }
     expect(body).toMatchObject({ found: true, source: 'crowd' })
     expect(body.product.name).toBe('Chilli Masala')
+    expect(body.brand?.name).toBe('Aachi')
     expect(body.variants[0].barcode).toBe(barcode)
-    expect(body.names[0].lang).toBe('ta')
+    expect(body.translations[0].lang).toBe('ta')
+  })
+
+  it('round-trips descriptions, ingredients and per-language translations', async () => {
+    const barcode = '8904209309999'
+    const post = await SELF.fetch(`${BASE}/v1/products`, {
+      method: 'POST',
+      headers: ADMIN,
+      body: JSON.stringify({
+        brand: {
+          name: 'Aachi',
+          description: 'South Indian masala brand',
+          translations: [{ lang: 'ta', name: 'ஆச்சி', description: 'மசாலா' }],
+        },
+        product: {
+          name: 'Chilli Masala',
+          food_type: 'veg',
+          description: 'Spicy red chilli blend',
+          ingredients: 'Red chilli, salt',
+        },
+        variants: [{ label: '100g', barcode, mrp_paise: 4500 }],
+        translations: [{ lang: 'ta', name: 'மிளகாய்', description: 'காரம்', ingredients: 'மிளகாய், உப்பு' }],
+      }),
+    })
+    expect(post.status).toBe(201)
+
+    const body = (await (await SELF.fetch(`${BASE}/v1/product/${barcode}`)).json()) as {
+      product: { description: string; ingredients: string }
+      brand: { name: string; description: string } | null
+      translations: { lang: string; description: string; ingredients: string }[]
+      brand_translations: { lang: string; name: string; description: string }[]
+    }
+    expect(body.product.description).toBe('Spicy red chilli blend')
+    expect(body.product.ingredients).toBe('Red chilli, salt')
+    expect(body.brand?.description).toBe('South Indian masala brand')
+    expect(body.translations.find((t) => t.lang === 'ta')?.ingredients).toBe('மிளகாய், உப்பு')
+    expect(body.brand_translations.find((t) => t.lang === 'ta')?.name).toBe('ஆச்சி')
   })
 
   it('POST a duplicate barcode → 409', async () => {

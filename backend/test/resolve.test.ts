@@ -17,11 +17,14 @@ function makeProduct(barcode: string): ResolvedProduct {
       hsn_code: '',
       category: 'Spices',
       food_type: 'veg',
+      description: '',
+      ingredients: '',
       source: 'crowd',
       moderation_status: 'approved',
       created_at: NOW,
       updated_at: NOW,
     },
+    brand: null,
     variants: [
       {
         id: 'v1',
@@ -37,7 +40,8 @@ function makeProduct(barcode: string): ResolvedProduct {
         updated_at: NOW,
       },
     ],
-    names: [],
+    translations: [],
+    brand_translations: [],
   }
 }
 
@@ -75,7 +79,7 @@ describe('resolveBarcode', () => {
     expect(res.source).toBe('crowd')
     expect(res.product?.name).toBe('Aachi Chilli Masala')
     expect(res.variants?.[0].mrp_paise).toBe(4500)
-    expect(res.names).toEqual([])
+    expect(res.translations).toEqual([])
     expect(calls.n).toBe(0)
   })
 

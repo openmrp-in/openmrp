@@ -36,8 +36,10 @@ router.post('/', async (c) => {
       {
         created: true,
         product: created.product,
+        brand: created.brand,
         variants: created.variants,
-        names: created.names,
+        translations: created.translations,
+        brand_translations: created.brand_translations,
       },
       201,
     )

@@ -1,6 +1,27 @@
+/** Per-language product text. */
+export interface ProductTranslationInput {
+  lang: string
+  name: string
+  description: string
+  ingredients: string
+}
+
+/** Per-language brand text. */
+export interface BrandTranslationInput {
+  lang: string
+  name: string
+  description: string
+}
+
 /** Input accepted by POST /v1/products (admin create). */
 export interface CreateProductInput {
-  brand?: { name: string; slug?: string; manufacturer?: string }
+  brand?: {
+    name: string
+    slug?: string
+    manufacturer?: string
+    description: string
+    translations: BrandTranslationInput[]
+  }
   product: {
     name: string
     group_key?: string
@@ -8,6 +29,8 @@ export interface CreateProductInput {
     hsn_code?: string
     category?: string
     food_type: string
+    description: string
+    ingredients: string
   }
   variants: Array<{
     label?: string
@@ -16,7 +39,7 @@ export interface CreateProductInput {
     barcode?: string
     mrp_paise?: number
   }>
-  names: Array<{ lang: string; name: string }>
+  translations: ProductTranslationInput[]
 }
 
 const FOOD_TYPES = new Set(['veg', 'non-veg', 'egg', 'none'])
@@ -25,9 +48,13 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
 }
 
+function str(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
 /**
  * Validate and normalize a create-product payload. Pure: returns the cleaned value
- * plus a list of human-readable errors (empty list = valid).
+ * (every text field defaulted) plus a list of errors (empty list = valid).
  */
 export function validateCreateProduct(body: unknown): {
   value: CreateProductInput
@@ -38,9 +65,8 @@ export function validateCreateProduct(body: unknown): {
 
   // product
   const product = asRecord(b.product)
-  const productName = typeof product.name === 'string' ? product.name.trim() : ''
+  const productName = str(product.name)
   if (!productName) errors.push('product.name is required')
-
   const foodType = typeof product.food_type === 'string' ? product.food_type : 'none'
   if (!FOOD_TYPES.has(foodType)) {
     errors.push(`product.food_type must be one of: ${[...FOOD_TYPES].join(', ')}`)
@@ -51,10 +77,8 @@ export function validateCreateProduct(body: unknown): {
   if (rawVariants.length === 0) errors.push('at least one variant is required')
   const variants = rawVariants.map((rv, i) => {
     const v = asRecord(rv)
-    if (v.mrp_paise !== undefined) {
-      if (typeof v.mrp_paise !== 'number' || !Number.isInteger(v.mrp_paise) || v.mrp_paise < 0) {
-        errors.push(`variants[${i}].mrp_paise must be a non-negative integer`)
-      }
+    if (v.mrp_paise !== undefined && (typeof v.mrp_paise !== 'number' || !Number.isInteger(v.mrp_paise) || v.mrp_paise < 0)) {
+      errors.push(`variants[${i}].mrp_paise must be a non-negative integer`)
     }
     if (v.barcode !== undefined && typeof v.barcode !== 'string') {
       errors.push(`variants[${i}].barcode must be a string`)
@@ -68,27 +92,34 @@ export function validateCreateProduct(body: unknown): {
     }
   })
 
-  // names (multilingual, optional)
-  const rawNames = Array.isArray(b.names) ? b.names : []
-  const names = rawNames.map((rn, i) => {
-    const n = asRecord(rn)
-    const lang = typeof n.lang === 'string' ? n.lang.trim() : ''
-    const name = typeof n.name === 'string' ? n.name.trim() : ''
-    if (!lang) errors.push(`names[${i}].lang is required`)
-    if (!name) errors.push(`names[${i}].name is required`)
-    return { lang, name }
+  // product translations
+  const rawTranslations = Array.isArray(b.translations) ? b.translations : []
+  const translations: ProductTranslationInput[] = rawTranslations.map((rt, i) => {
+    const t = asRecord(rt)
+    const lang = str(t.lang)
+    if (!lang) errors.push(`translations[${i}].lang is required`)
+    return { lang, name: str(t.name), description: str(t.description), ingredients: str(t.ingredients) }
   })
 
   // brand (optional)
   let brand: CreateProductInput['brand']
   if (b.brand !== undefined) {
     const br = asRecord(b.brand)
-    const brandName = typeof br.name === 'string' ? br.name.trim() : ''
+    const brandName = str(br.name)
     if (!brandName) errors.push('brand.name is required when brand is provided')
+    const rawBrandTr = Array.isArray(br.translations) ? br.translations : []
+    const brandTranslations: BrandTranslationInput[] = rawBrandTr.map((rt, i) => {
+      const t = asRecord(rt)
+      const lang = str(t.lang)
+      if (!lang) errors.push(`brand.translations[${i}].lang is required`)
+      return { lang, name: str(t.name), description: str(t.description) }
+    })
     brand = {
       name: brandName,
       slug: typeof br.slug === 'string' ? br.slug : undefined,
       manufacturer: typeof br.manufacturer === 'string' ? br.manufacturer : undefined,
+      description: str(br.description),
+      translations: brandTranslations,
     }
   }
 
@@ -101,9 +132,11 @@ export function validateCreateProduct(body: unknown): {
       hsn_code: typeof product.hsn_code === 'string' ? product.hsn_code : undefined,
       category: typeof product.category === 'string' ? product.category : undefined,
       food_type: foodType,
+      description: str(product.description),
+      ingredients: str(product.ingredients),
     },
     variants,
-    names,
+    translations,
   }
   return { value, errors }
 }

@@ -20,11 +20,27 @@ export interface Product {
   hsn_code: string
   category: string
   food_type: string
+  description: string
+  ingredients: string
 }
 
-export interface ProductName {
+export interface Brand {
+  id: string
+  name: string
+  description: string
+}
+
+export interface ProductTranslation {
   lang: string
   name: string
+  description: string
+  ingredients: string
+}
+
+export interface BrandTranslation {
+  lang: string
+  name: string
+  description: string
 }
 
 export interface OffSuggestion {
@@ -39,8 +55,10 @@ export interface ResolveResult {
   found: boolean
   source: 'crowd' | 'off' | 'none'
   product?: Product
+  brand?: Brand | null
   variants?: Variant[]
-  names?: ProductName[]
+  translations?: ProductTranslation[]
+  brand_translations?: BrandTranslation[]
   off_suggestion?: OffSuggestion
 }
 

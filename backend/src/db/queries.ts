@@ -2,7 +2,14 @@ import type { SeedItem } from '../lib/seed'
 import type { CreateProductInput } from '../lib/validate'
 import { slugify } from '../lib/slug'
 import { ulid } from '../lib/ulid'
-import type { ProductRow, ProductNameRow, ResolvedProduct, VariantRow } from './schema'
+import type {
+  BrandRow,
+  BrandTranslationRow,
+  ProductRow,
+  ProductTranslationRow,
+  ResolvedProduct,
+  VariantRow,
+} from './schema'
 
 /** Outcome counts from a bulk upsert (seeding). */
 export interface BulkResult {
@@ -74,16 +81,29 @@ export function createD1Store(db: D1Database): ProductStore {
     /* istanbul ignore if -- @preserve: defensive; a variant's FK guarantees its product exists */
     if (!product) return null
 
+    const brand: BrandRow | null = product.brand_id
+      ? await db.prepare('SELECT * FROM brands WHERE id = ?').bind(product.brand_id).first<BrandRow>()
+      : null
+
     const variants = await db
       .prepare('SELECT * FROM variants WHERE product_id = ? ORDER BY pack_size')
       .bind(productId)
       .all<VariantRow>()
-    const names = await db
-      .prepare('SELECT * FROM product_names WHERE product_id = ?')
+    const translations = await db
+      .prepare('SELECT * FROM product_translations WHERE product_id = ?')
       .bind(productId)
-      .all<ProductNameRow>()
+      .all<ProductTranslationRow>()
+    const brandTranslations = brand
+      ? (await db.prepare('SELECT * FROM brand_translations WHERE brand_id = ?').bind(brand.id).all<BrandTranslationRow>()).results
+      : []
 
-    return { product, variants: variants.results, names: names.results }
+    return {
+      product,
+      brand,
+      variants: variants.results,
+      translations: translations.results,
+      brand_translations: brandTranslations,
+    }
   }
 
   return {
@@ -100,9 +120,9 @@ export function createD1Store(db: D1Database): ProductStore {
       const now = new Date().toISOString()
       const stmts: D1PreparedStatement[] = []
 
-      // Resolve or create the brand. A *new* brand is inserted as part of the same
-      // batch below, so the whole create (brand + product + variants + names) is
-      // one atomic transaction — no orphan brand if a later insert fails.
+      // Resolve or create the brand (+ its per-language translations). A *new* brand
+      // is inserted as part of the same batch below, so the whole create is one atomic
+      // transaction — no orphan brand if a later insert fails.
       let brandId: string | null = null
       if (input.brand) {
         const slug = slugify(input.brand.slug || input.brand.name)
@@ -117,18 +137,28 @@ export function createD1Store(db: D1Database): ProductStore {
           stmts.push(
             db
               .prepare(
-                'INSERT INTO brands (id, name, slug, manufacturer, source, moderation_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO brands (id, name, slug, manufacturer, description, source, moderation_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
               )
               .bind(
                 brandId,
                 input.brand.name,
                 slug,
                 input.brand.manufacturer ?? '',
+                input.brand.description,
                 'crowd',
                 'approved',
                 now,
                 now,
               ),
+          )
+        }
+        for (const t of input.brand.translations) {
+          stmts.push(
+            db
+              .prepare(
+                'INSERT INTO brand_translations (id, brand_id, lang, name, description, source, verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(brand_id, lang) DO UPDATE SET name = excluded.name, description = excluded.description',
+              )
+              .bind(ulid(), brandId, t.lang, t.name, t.description, 'crowd', 0, now),
           )
         }
       }
@@ -139,7 +169,7 @@ export function createD1Store(db: D1Database): ProductStore {
       stmts.push(
         db
           .prepare(
-            'INSERT INTO products (id, brand_id, name, group_key, image_url, hsn_code, category, food_type, source, moderation_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO products (id, brand_id, name, group_key, image_url, hsn_code, category, food_type, description, ingredients, source, moderation_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           )
           .bind(
             productId,
@@ -150,6 +180,8 @@ export function createD1Store(db: D1Database): ProductStore {
             input.product.hsn_code ?? '',
             input.product.category ?? '',
             input.product.food_type,
+            input.product.description,
+            input.product.ingredients,
             'crowd',
             'pending',
             now,
@@ -179,13 +211,13 @@ export function createD1Store(db: D1Database): ProductStore {
         )
       }
 
-      for (const n of input.names) {
+      for (const t of input.translations) {
         stmts.push(
           db
             .prepare(
-              'INSERT INTO product_names (id, product_id, lang, name, source, verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              'INSERT INTO product_translations (id, product_id, lang, name, description, ingredients, source, verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             )
-            .bind(ulid(), productId, n.lang, n.name, 'crowd', 0, now),
+            .bind(ulid(), productId, t.lang, t.name, t.description, t.ingredients, 'crowd', 0, now),
         )
       }
 

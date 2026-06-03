@@ -6,15 +6,26 @@ const { barcode = '' } = Astro.params
 const result = await getProduct(barcode)
 const product = result.product
 const variants = result.variants ?? []
-const names = result.names ?? []
+const translations = result.translations ?? []
+const brandTranslations = result.brand_translations ?? []
 const suggestion = result.off_suggestion
 
 if (!result.found) Astro.response.status = 404
 
-const displayName = product?.name ?? suggestion?.name ?? `Barcode ${barcode}`
+// Per-language view: ?lang=ta picks a translation; otherwise the canonical text.
+const lang = (Astro.url.searchParams.get('lang') ?? '').trim()
+const tr = lang ? translations.find((t) => t.lang === lang) : undefined
+const brandTr = lang ? brandTranslations.find((t) => t.lang === lang) : undefined
+
+const displayName = tr?.name || product?.name || suggestion?.name || `Barcode ${barcode}`
+const description = tr?.description || product?.description || ''
+const ingredients = tr?.ingredients || product?.ingredients || ''
+const brandName = brandTr?.name || result.brand?.name || ''
+const brandDesc = brandTr?.description || result.brand?.description || ''
+
 const pageTitle = result.found ? `${displayName} — OpenMRP` : `Barcode ${barcode} — OpenMRP`
-const description = result.found
-  ? `${displayName}: pack sizes, MRP, veg/non-veg and details. Free, open product data for India.`
+const pageDesc = result.found
+  ? `${displayName}${brandName ? ` by ${brandName}` : ''}: pack sizes, MRP, ingredients. Free, open product data for India.`
   : `No product yet for barcode ${barcode}. OpenMRP — free, open product data for India.`
 
 const mrps = variants.map((v) => v.mrp_paise).filter((p) => p > 0)
@@ -27,6 +38,8 @@ const jsonLd = product
       '@type': 'Product',
       name: displayName,
       gtin: barcode,
+      ...(brandName ? { brand: { '@type': 'Brand', name: brandName } } : {}),
+      ...(description ? { description } : {}),
       ...(product.category ? { category: product.category } : {}),
       ...(lowestMrp > 0
         ? { offers: { '@type': 'Offer', priceCurrency: 'INR', price: (lowestMrp / 100).toFixed(2) } }
@@ -35,18 +48,33 @@ const jsonLd = product
   : undefined
 ---
 
-<Base title={pageTitle} description={description} canonical={canonical} jsonLd={jsonLd}>
+<Base title={pageTitle} description={pageDesc} canonical={canonical} jsonLd={jsonLd}>
   {
     result.found && product ? (
       <article class="card">
         <p class="barcode">Barcode {barcode}</p>
         <h1>{displayName}</h1>
+        {brandName && <p class="brandline">{brandName}</p>}
+
+        {translations.length > 0 && (
+          <div class="langtabs">
+            <a href={`/p/${barcode}`} class={lang ? '' : 'active'}>Default</a>
+            {translations.map((t) => (
+              <a href={`/p/${barcode}?lang=${t.lang}`} class={lang === t.lang ? 'active' : ''}>
+                {t.lang.toUpperCase()}
+              </a>
+            ))}
+          </div>
+        )}
+
         <div class="chips">
           {product.food_type !== 'none' && (
             <span class={`chip ${product.food_type}`}>{foodTypeLabel(product.food_type)}</span>
           )}
           {product.category && <span class="chip">{product.category}</span>}
         </div>
+
+        {description && <p class="desc">{description}</p>}
 
         <h2>Pack sizes &amp; MRP</h2>
         <table>
@@ -70,16 +98,17 @@ const jsonLd = product
           </tbody>
         </table>
 
-        {names.length > 0 && (
+        {ingredients && (
           <Fragment>
-            <h2>Names</h2>
-            <ul class="names">
-              {names.map((n) => (
-                <li>
-                  <span class="lang">{n.lang}</span> {n.name}
-                </li>
-              ))}
-            </ul>
+            <h2>Ingredients</h2>
+            <p class="desc">{ingredients}</p>
+          </Fragment>
+        )}
+
+        {brandDesc && (
+          <Fragment>
+            <h2>About {brandName}</h2>
+            <p class="desc">{brandDesc}</p>
           </Fragment>
         )}
 
@@ -104,3 +133,11 @@ const jsonLd = product
     )
   }
 </Base>
+
+<style>
+  .brandline { color: #555; margin: -6px 0 10px; font-size: 15px; }
+  .desc { color: #333; line-height: 1.55; margin: 8px 0 0; }
+  .langtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 14px; }
+  .langtabs a { font-size: 12px; padding: 4px 9px; border-radius: 999px; border: 1px solid #e2e2df; color: #555; text-decoration: none; background: #fff; }
+  .langtabs a.active { background: #0a7d3c; border-color: #0a7d3c; color: #fff; }
+</style>

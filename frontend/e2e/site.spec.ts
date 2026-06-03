@@ -3,11 +3,20 @@ import { test, expect } from '@playwright/test'
 const API = 'http://127.0.0.1:8787'
 const ADMIN = 'local-dev-admin-key-change-me'
 
-// Seed a deterministic product so the assertions don't depend on prior data.
+// Seed deterministic products so the assertions don't depend on prior data.
 test.beforeAll(async ({ request }) => {
   await request.post(`${API}/v1/products/bulk`, {
     headers: { 'X-Admin-Key': ADMIN },
     data: { items: [{ barcode: '7000000000007', name: 'E2E Test Biscuit', brand: 'E2EBrand' }] },
+  })
+  await request.post(`${API}/v1/products`, {
+    headers: { 'X-Admin-Key': ADMIN },
+    data: {
+      brand: { name: 'MLBrand' },
+      product: { name: 'ML E2E', food_type: 'veg', description: 'English desc' },
+      variants: [{ label: '100g', barcode: '7100000099999', mrp_paise: 2000 }],
+      translations: [{ lang: 'ta', name: 'எம்எல்', description: 'தமிழ்' }],
+    },
   })
 })
 
@@ -43,4 +52,17 @@ test('brands page lists brands', async ({ page }) => {
 test('brand page lists its products', async ({ page }) => {
   await page.goto('/brand/e2ebrand')
   await expect(page.getByText('E2E Test Biscuit')).toBeVisible()
+})
+
+test('product page renders the default language with a language tab', async ({ page }) => {
+  await page.goto('/p/7100000099999')
+  await expect(page.getByRole('heading', { name: 'ML E2E' })).toBeVisible()
+  await expect(page.getByText('English desc')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'TA' })).toBeVisible()
+})
+
+test('product page switches to Tamil via ?lang', async ({ page }) => {
+  await page.goto('/p/7100000099999?lang=ta')
+  await expect(page.getByRole('heading', { name: 'எம்எல்' })).toBeVisible()
+  await expect(page.getByText('தமிழ்')).toBeVisible()
 })
