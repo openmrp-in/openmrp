@@ -1,0 +1,53 @@
+---
+import Base from '../layouts/Base.astro'
+---
+
+<Base title="Review queue — OpenMRP" description="Approve or reject pending community contributions.">
+  <h1>Review queue</h1>
+  <p class="muted">Two approvals from distinct accounts apply a change. You can't approve your own.</p>
+  <div id="app"><p class="empty">Loading…</p></div>
+</Base>
+
+<script>
+  import { api, getToken } from '../client/portal'
+  import { canReview, escapeHtml, approvalText } from '../lib/moderation'
+
+  const app = document.getElementById('app') as HTMLElement
+  if (!getToken()) location.href = '/developers/login'
+
+  interface Contribution { id: string; note: string; product_id: string; approvals: number }
+
+  async function load() {
+    const me = await (await api('/v1/auth/me')).json()
+    if (!canReview(me.roles)) {
+      app.innerHTML = '<p class="notice">You need the contributor or admin role to review contributions.</p>'
+      return
+    }
+    const queue = (await (await api('/v1/contributions')).json()).contributions as Contribution[]
+    app.innerHTML = queue.length === 0
+      ? '<p class="empty">Nothing pending. 🎉</p>'
+      : queue.map(card).join('')
+    document.querySelectorAll<HTMLElement>('.approve').forEach((b) => (b.onclick = () => act(b.dataset.id as string, 'approve')))
+    document.querySelectorAll<HTMLElement>('.reject').forEach((b) => (b.onclick = () => act(b.dataset.id as string, 'reject')))
+  }
+
+  function card(c: Contribution): string {
+    return `<div class="card" style="margin-bottom:12px">
+      <p class="barcode">product ${escapeHtml(c.product_id)}</p>
+      <p>${escapeHtml(c.note || '(no note)')}</p>
+      <p class="muted">${approvalText(c.approvals)}</p>
+      <div class="rowactions">
+        <button class="primary approve" data-id="${escapeHtml(c.id)}">Approve</button>
+        <button class="ghost reject" data-id="${escapeHtml(c.id)}">Reject</button>
+      </div>
+    </div>`
+  }
+
+  async function act(id: string, action: 'approve' | 'reject') {
+    const res = await api(`/v1/contributions/${id}/${action}`, { method: 'POST' })
+    if (res.status === 403) { alert('You cannot ' + action + ' this contribution.'); return }
+    await load()
+  }
+
+  load()
+</script>

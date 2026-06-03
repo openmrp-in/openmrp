@@ -26,7 +26,12 @@ export const getAdminKey = (): string | null => sessionStorage.getItem(ADMIN_KEY
 export const setAdminKey = (k: string): void => sessionStorage.setItem(ADMIN_KEY, k)
 export const clearAdminKey = (): void => sessionStorage.removeItem(ADMIN_KEY)
 
-/** Fetch an admin endpoint with the X-Admin-Key header. */
-export async function adminApi(path: string): Promise<Response> {
-  return fetch(`${API_BASE}${path}`, { headers: { 'X-Admin-Key': getAdminKey() ?? '' } })
+/** Fetch an admin endpoint with the X-Admin-Key header (supports GET + mutations). */
+export async function adminApi(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    'X-Admin-Key': getAdminKey() ?? '',
+    ...((init.headers as Record<string, string>) ?? {}),
+  }
+  return fetch(`${API_BASE}${path}`, { ...init, headers })
 }

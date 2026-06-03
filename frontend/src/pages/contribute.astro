@@ -1,0 +1,137 @@
+---
+import Base from '../layouts/Base.astro'
+---
+
+<Base title="Contribute — OpenMRP" description="Propose a correction or translation for a product.">
+  <h1>Contribute an edit</h1>
+  <p class="muted">Load a product by barcode, fix its details or add a translation, and submit. Brand owners' edits apply instantly; everyone else's apply after two approvals.</p>
+  <div id="loadbar">
+    <label class="field"><span>Barcode</span><input id="barcode" placeholder="8901000000000" /></label>
+    <button id="load" class="primary">Load product</button>
+  </div>
+  <div id="form"></div>
+  <h2>My contributions</h2>
+  <div id="mine"><p class="empty">Loading…</p></div>
+</Base>
+
+<script>
+  import { api, getToken } from '../client/portal'
+  import { buildEditPayload, escapeHtml, statusChip, approvalText } from '../lib/moderation'
+
+  interface Tr { lang: string; name: string; description: string; ingredients: string }
+  interface State { product: Record<string, string>; translations: Tr[] }
+
+  const form = document.getElementById('form') as HTMLElement
+  const mine = document.getElementById('mine') as HTMLElement
+  const barcodeInput = document.getElementById('barcode') as HTMLInputElement
+  if (!getToken()) location.href = '/developers/login'
+
+  const params = new URLSearchParams(location.search)
+  const preset = params.get('barcode')
+  if (preset) barcodeInput.value = preset
+
+  function field(id: string, label: string, value: string, ta = false): string {
+    const input = ta
+      ? `<textarea id="${id}">${escapeHtml(value)}</textarea>`
+      : `<input id="${id}" value="${escapeHtml(value)}" />`
+    return `<label class="field"><span>${label}</span>${input}</label>`
+  }
+
+  function trRow(t: Tr): string {
+    return `<div class="txrow">
+      <input class="t-lang" placeholder="hi" value="${escapeHtml(t.lang)}" />
+      <input class="t-name" placeholder="name" value="${escapeHtml(t.name)}" />
+      <input class="t-ing" placeholder="ingredients" value="${escapeHtml(t.ingredients)}" />
+      <button class="ghost t-del" type="button">✕</button>
+    </div>`
+  }
+
+  function renderForm(barcode: string, s: State) {
+    const p = s.product
+    const ft = p.food_type || 'none'
+    const opt = (v: string, l: string) => `<option value="${v}"${ft === v ? ' selected' : ''}>${l}</option>`
+    form.innerHTML = `
+      <div class="card" style="margin-top:14px">
+        <p class="barcode">${escapeHtml(barcode)}</p>
+        ${field('f-name', 'Name', p.name || '')}
+        ${field('f-desc', 'Description', p.description || '', true)}
+        ${field('f-ing', 'Ingredients', p.ingredients || '', true)}
+        ${field('f-cat', 'Category', p.category || '')}
+        <label class="field"><span>Food type</span><select id="f-ft">${opt('none', 'Unspecified')}${opt('veg', 'Veg')}${opt('non-veg', 'Non-veg')}${opt('egg', 'Contains egg')}</select></label>
+        ${field('f-img', 'Image URL', p.image_url || '')}
+        ${field('f-hsn', 'HSN code', p.hsn_code || '')}
+        <h2>Translations</h2>
+        <div id="trs">${s.translations.map(trRow).join('')}</div>
+        <button id="addtr" class="ghost" type="button">+ Add translation</button>
+        <p><label class="field"><span>Note (optional)</span><input id="f-note" placeholder="what changed + why" /></label></p>
+        <button id="submit" class="primary" data-barcode="${escapeHtml(barcode)}">Submit edit</button>
+        <p id="result" class="msg"></p>
+      </div>`
+    document.getElementById('addtr')!.onclick = () => {
+      const wrap = document.createElement('div')
+      wrap.innerHTML = trRow({ lang: '', name: '', description: '', ingredients: '' })
+      const row = wrap.firstElementChild as HTMLElement
+      document.getElementById('trs')!.appendChild(row)
+      ;(row.querySelector('.t-del') as HTMLElement).onclick = () => row.remove()
+    }
+    document.querySelectorAll<HTMLElement>('.t-del').forEach((b) => (b.onclick = () => b.closest('.txrow')!.remove()))
+    ;(document.getElementById('submit') as HTMLElement).onclick = submit
+  }
+
+  async function loadProduct() {
+    const barcode = barcodeInput.value.trim()
+    if (!barcode) return
+    const res = await api(`/v1/contributions/product/${encodeURIComponent(barcode)}`)
+    if (res.status === 404) {
+      form.innerHTML = `<p class="notice">No product found for that barcode.</p>`
+      return
+    }
+    const s = (await res.json()) as State
+    renderForm(barcode, s)
+  }
+
+  async function submit(ev: Event) {
+    const barcode = (ev.currentTarget as HTMLElement).dataset.barcode as string
+    const result = document.getElementById('result') as HTMLElement
+    const trs: Tr[] = [...document.querySelectorAll('#trs .txrow')].map((r) => ({
+      lang: (r.querySelector('.t-lang') as HTMLInputElement).value,
+      name: (r.querySelector('.t-name') as HTMLInputElement).value,
+      description: '',
+      ingredients: (r.querySelector('.t-ing') as HTMLInputElement).value,
+    }))
+    const edit = buildEditPayload(
+      {
+        name: (document.getElementById('f-name') as HTMLInputElement).value,
+        description: (document.getElementById('f-desc') as HTMLTextAreaElement).value,
+        ingredients: (document.getElementById('f-ing') as HTMLTextAreaElement).value,
+        category: (document.getElementById('f-cat') as HTMLInputElement).value,
+        food_type: (document.getElementById('f-ft') as HTMLSelectElement).value,
+        image_url: (document.getElementById('f-img') as HTMLInputElement).value,
+        hsn_code: (document.getElementById('f-hsn') as HTMLInputElement).value,
+      },
+      trs,
+    )
+    const note = (document.getElementById('f-note') as HTMLInputElement).value
+    const res = await api('/v1/contributions', { method: 'POST', body: JSON.stringify({ barcode, edit, note }) })
+    if (res.status === 403) { result.textContent = 'You need the contributor role (or brand ownership) to submit.'; return }
+    if (res.status === 404) { result.textContent = 'Product not found.'; return }
+    const body = (await res.json()) as { status: string }
+    result.className = 'success'
+    result.textContent = body.status === 'applied' ? 'Applied — thank you!' : 'Submitted — pending two approvals.'
+    await loadMine()
+  }
+
+  async function loadMine() {
+    const res = await api('/v1/contributions/mine')
+    const list = (await res.json()).contributions as { id: string; status: string; note: string; approvals: number }[]
+    mine.innerHTML = list.length === 0
+      ? '<p class="empty">No contributions yet.</p>'
+      : `<table><thead><tr><th>Note</th><th>Status</th><th>Approvals</th></tr></thead><tbody>${list
+          .map((c) => `<tr><td>${escapeHtml(c.note || '—')}</td><td>${statusChip(c.status)}</td><td>${approvalText(c.approvals)}</td></tr>`)
+          .join('')}</tbody></table>`
+  }
+
+  ;(document.getElementById('load') as HTMLElement).onclick = loadProduct
+  if (preset) loadProduct()
+  loadMine()
+</script>
