@@ -1,0 +1,30 @@
+---
+import type { ProductCard } from '../lib/api'
+import { rupees, foodTypeLabel } from '../lib/api'
+
+interface Props {
+  products: ProductCard[]
+}
+const { products } = Astro.props
+---
+
+<ul class="grid">
+  {
+    products.map((p) => (
+      <li>
+        <a href={`/p/${p.barcode}`}>
+          <span class="pname">{p.name}</span>
+          {p.brand && <span class="pbrand">{p.brand}</span>}
+          <span class="prow">
+            {p.food_type !== 'none' ? (
+              <span class={`chip ${p.food_type}`}>{foodTypeLabel(p.food_type)}</span>
+            ) : (
+              <span />
+            )}
+            <span class="pmrp">{p.mrp_paise > 0 ? rupees(p.mrp_paise) : '—'}</span>
+          </span>
+        </a>
+      </li>
+    ))
+  }
+</ul>

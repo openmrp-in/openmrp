@@ -1,0 +1,30 @@
+---
+import Base from '../layouts/Base.astro'
+import { listBrands } from '../lib/api'
+
+const brands = await listBrands()
+---
+
+<Base
+  title="Brands — OpenMRP"
+  description="Browse brands in OpenMRP — free, open product data for India."
+  canonical="https://openmrp.in/brands"
+>
+  <h1>Brands</h1>
+  {
+    brands.length === 0 ? (
+      <p class="empty">No brands yet.</p>
+    ) : (
+      <ul class="brandlist">
+        {brands.map((b) => (
+          <li>
+            <a href={`/brand/${b.slug}`}>
+              <span>{b.name}</span>
+              <span class="count">{b.product_count}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</Base>

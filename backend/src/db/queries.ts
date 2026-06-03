@@ -11,6 +11,22 @@ export interface BulkResult {
   skipped: number
 }
 
+/** A compact product result for search / browse listings. */
+export interface ProductCard {
+  barcode: string
+  name: string
+  brand: string
+  food_type: string
+  mrp_paise: number
+}
+
+/** A brand with its approved-product count, for the browse index. */
+export interface BrandSummary {
+  slug: string
+  name: string
+  product_count: number
+}
+
 /**
  * The persistence surface the rest of the app depends on. Defined as an interface
  * so the resolve chain + routes can be unit-tested with an in-memory fake
@@ -27,7 +43,26 @@ export interface ProductStore {
    * (any other source) is skipped.
    */
   bulkUpsert(items: SeedItem[]): Promise<BulkResult>
+  /** Search approved products by name (substring, case-insensitive). */
+  searchProducts(query: string, limit: number): Promise<ProductCard[]>
+  /** List approved brands that have at least one approved product, busiest first. */
+  listBrands(limit: number): Promise<BrandSummary[]>
+  /** Approved products for a brand slug. */
+  productsByBrand(slug: string, limit: number): Promise<ProductCard[]>
 }
+
+// Shared SELECT for a ProductCard: representative barcode + lowest known MRP.
+const CARD_SELECT = `
+  SELECT
+    COALESCE((SELECT v.barcode FROM variants v WHERE v.product_id = p.id AND v.barcode <> '' LIMIT 1), '') AS barcode,
+    p.name AS name,
+    COALESCE(b.name, '') AS brand,
+    p.food_type AS food_type,
+    COALESCE((SELECT MIN(v.mrp_paise) FROM variants v WHERE v.product_id = p.id AND v.mrp_paise > 0), 0) AS mrp_paise
+  FROM products p
+  LEFT JOIN brands b ON b.id = p.brand_id
+  WHERE p.moderation_status = 'approved'
+    AND EXISTS (SELECT 1 FROM variants v WHERE v.product_id = p.id AND v.barcode <> '')`
 
 /** D1-backed implementation of ProductStore. */
 export function createD1Store(db: D1Database): ProductStore {
@@ -219,6 +254,38 @@ export function createD1Store(db: D1Database): ProductStore {
         result.inserted++
       }
       return result
+    },
+
+    async searchProducts(query: string, limit: number): Promise<ProductCard[]> {
+      const rows = await db
+        .prepare(`${CARD_SELECT} AND LOWER(p.name) LIKE '%' || LOWER(?) || '%' ORDER BY p.name LIMIT ?`)
+        .bind(query, limit)
+        .all<ProductCard>()
+      return rows.results
+    },
+
+    async listBrands(limit: number): Promise<BrandSummary[]> {
+      const rows = await db
+        .prepare(
+          `SELECT b.slug AS slug, b.name AS name, COUNT(p.id) AS product_count
+           FROM brands b
+           JOIN products p ON p.brand_id = b.id AND p.moderation_status = 'approved'
+           WHERE b.moderation_status = 'approved'
+           GROUP BY b.id
+           ORDER BY product_count DESC, b.name
+           LIMIT ?`,
+        )
+        .bind(limit)
+        .all<BrandSummary>()
+      return rows.results
+    },
+
+    async productsByBrand(slug: string, limit: number): Promise<ProductCard[]> {
+      const rows = await db
+        .prepare(`${CARD_SELECT} AND b.slug = ? ORDER BY p.name LIMIT ?`)
+        .bind(slug, limit)
+        .all<ProductCard>()
+      return rows.results
     },
   }
 }

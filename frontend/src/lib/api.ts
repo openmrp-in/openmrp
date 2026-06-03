@@ -57,6 +57,41 @@ export function rupees(paise: number): string {
   return (paise / 100).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })
 }
 
+export interface ProductCard {
+  barcode: string
+  name: string
+  brand: string
+  food_type: string
+  mrp_paise: number
+}
+
+export interface BrandSummary {
+  slug: string
+  name: string
+  product_count: number
+}
+
+/** Search products by name. Returns [] on any error (degrade gracefully). */
+export async function search(q: string, limit = 30): Promise<ProductCard[]> {
+  const res = await fetch(`${API_BASE}/v1/search?q=${encodeURIComponent(q)}&limit=${limit}`)
+  if (!res.ok) return []
+  return ((await res.json()) as { results: ProductCard[] }).results
+}
+
+/** List brands with product counts. */
+export async function listBrands(limit = 200): Promise<BrandSummary[]> {
+  const res = await fetch(`${API_BASE}/v1/brands?limit=${limit}`)
+  if (!res.ok) return []
+  return ((await res.json()) as { brands: BrandSummary[] }).brands
+}
+
+/** List products for a brand slug. */
+export async function productsByBrand(slug: string, limit = 60): Promise<ProductCard[]> {
+  const res = await fetch(`${API_BASE}/v1/brand/${encodeURIComponent(slug)}?limit=${limit}`)
+  if (!res.ok) return []
+  return ((await res.json()) as { results: ProductCard[] }).results
+}
+
 const FOOD_TYPE_LABELS: Record<string, string> = {
   veg: 'Veg',
   'non-veg': 'Non-veg',

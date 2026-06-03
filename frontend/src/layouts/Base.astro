@@ -1,0 +1,80 @@
+---
+interface Props {
+  title: string
+  description: string
+  canonical?: string
+  jsonLd?: object
+}
+const { title, description, canonical, jsonLd } = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    {canonical && <link rel="canonical" href={canonical} />}
+    {canonical && <meta property="og:url" content={canonical} />}
+    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+    <style is:global>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #1a1a1a; background: #f7f7f5; }
+      a { color: inherit; }
+      header.site { background: #fff; border-bottom: 1px solid #e5e5e2; padding: 14px 20px; display: flex; gap: 20px; align-items: baseline; }
+      header.site a.brand { font-weight: 700; color: #0a7d3c; text-decoration: none; font-size: 18px; }
+      header.site nav a { color: #555; text-decoration: none; font-size: 14px; margin-left: 14px; }
+      header.site nav a:hover { color: #0a7d3c; }
+      main { max-width: 760px; margin: 0 auto; padding: 24px 20px 64px; }
+      h1 { font-size: 26px; margin: 0 0 16px; }
+      h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .05em; color: #555; margin: 28px 0 10px; }
+      .card { background: #fff; border: 1px solid #e5e5e2; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding: 24px; }
+      .barcode { color: #777; font-size: 13px; letter-spacing: .04em; margin: 0 0 6px; }
+      .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+      .chip { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: #f0f0ee; border: 1px solid #e2e2df; }
+      .chip.veg { background: #e7f6ec; border-color: #b7e0c4; color: #0a7d3c; }
+      .chip.non-veg { background: #fdeaea; border-color: #f3c0c0; color: #b3261e; }
+      .chip.egg { background: #fbf2e3; border-color: #ecd9b0; color: #8a5a00; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #eee; }
+      th { font-size: 13px; color: #777; font-weight: 600; }
+      td.mrp { font-weight: 600; }
+      td.unknown { color: #999; font-weight: 400; }
+      ul.names { list-style: none; padding: 0; margin: 0; }
+      ul.names li { padding: 8px 0; border-bottom: 1px solid #f0f0ee; }
+      .lang { display: inline-block; min-width: 38px; font-size: 12px; color: #777; text-transform: uppercase; }
+      .attribution { margin-top: 28px; font-size: 12px; color: #999; }
+      footer.site { text-align: center; color: #999; font-size: 13px; padding: 24px; }
+      form.search { display: flex; gap: 8px; margin: 0 0 20px; }
+      form.search input { flex: 1; padding: 12px 14px; font-size: 16px; border: 1px solid #d6d6d2; border-radius: 10px; background: #fff; }
+      form.search input:focus { outline: none; border-color: #0a7d3c; box-shadow: 0 0 0 3px rgba(10,125,60,.15); }
+      form.search button { padding: 12px 20px; font-size: 15px; font-weight: 600; color: #fff; background: #0a7d3c; border: none; border-radius: 10px; cursor: pointer; }
+      form.search button:hover { background: #096a33; }
+      ul.grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+      ul.grid a { display: block; background: #fff; border: 1px solid #e5e5e2; border-radius: 10px; padding: 14px; text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
+      ul.grid a:hover { border-color: #b7e0c4; }
+      ul.grid .pname { display: block; font-weight: 600; margin-bottom: 4px; }
+      ul.grid .pbrand { display: block; color: #777; font-size: 13px; margin-bottom: 8px; }
+      ul.grid .prow { display: flex; justify-content: space-between; align-items: center; }
+      ul.grid .pmrp { font-weight: 600; color: #0a7d3c; }
+      ul.brandlist { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+      ul.brandlist a { display: flex; justify-content: space-between; background: #fff; border: 1px solid #e5e5e2; border-radius: 10px; padding: 12px 14px; text-decoration: none; }
+      ul.brandlist a:hover { border-color: #b7e0c4; }
+      ul.brandlist .count { color: #999; font-size: 13px; }
+      p.empty { color: #777; }
+    </style>
+  </head>
+  <body>
+    <header class="site">
+      <a class="brand" href="/">OpenMRP</a>
+      <nav><a href="/brands">Brands</a></nav>
+    </header>
+    <main><slot /></main>
+    <footer class="site">OpenMRP — free, open product data for India.</footer>
+  </body>
+</html>

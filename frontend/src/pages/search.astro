@@ -1,0 +1,33 @@
+---
+import Base from '../layouts/Base.astro'
+import ProductGrid from '../components/ProductGrid.astro'
+import { search } from '../lib/api'
+
+const q = (Astro.url.searchParams.get('q') ?? '').trim()
+
+// A bare barcode goes straight to the product page.
+if (/^[0-9]{8,14}$/.test(q)) {
+  return Astro.redirect(`/p/${q}`)
+}
+
+const results = q.length >= 2 ? await search(q) : []
+const title = q ? `“${q}” — OpenMRP search` : 'Search — OpenMRP'
+---
+
+<Base title={title} description={`Search results for ${q} on OpenMRP.`}>
+  <h1>Search</h1>
+  <form class="search" action="/search" method="get">
+    <input name="q" value={q} autocomplete="off" placeholder="Search a product, or a barcode…" aria-label="Search" required />
+    <button type="submit">Search</button>
+  </form>
+
+  {
+    q.length < 2 ? (
+      <p class="empty">Type at least 2 characters, or enter a barcode.</p>
+    ) : results.length === 0 ? (
+      <p class="empty">No products found for “{q}”.</p>
+    ) : (
+      <ProductGrid products={results} />
+    )
+  }
+</Base>

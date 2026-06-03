@@ -214,6 +214,71 @@ describe('bulk upsert (seeding)', () => {
   })
 })
 
+describe('search + browse', () => {
+  function seed(items: unknown[]) {
+    return SELF.fetch(`${BASE}/v1/products/bulk`, { method: 'POST', headers: ADMIN, body: JSON.stringify({ items }) })
+  }
+
+  it('searches approved products by name', async () => {
+    await seed([
+      { barcode: '6000000000001', name: 'Parle G Biscuit', brand: 'Parle' },
+      { barcode: '6000000000002', name: 'Marie Gold', brand: 'Britannia' },
+    ])
+    const res = await SELF.fetch(`${BASE}/v1/search?q=parle`)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { query: string; results: { name: string; brand: string; barcode: string }[] }
+    expect(body.query).toBe('parle')
+    expect(body.results.some((r) => r.name === 'Parle G Biscuit' && r.brand === 'Parle' && r.barcode === '6000000000001')).toBe(true)
+    expect(body.results.some((r) => r.name === 'Marie Gold')).toBe(false)
+  })
+
+  it('returns an empty result set for no matches', async () => {
+    await seed([{ barcode: '6000000000003', name: 'Something', brand: 'X' }])
+    const res = await SELF.fetch(`${BASE}/v1/search?q=zzzznotfound`)
+    expect(((await res.json()) as { results: unknown[] }).results).toEqual([])
+  })
+
+  it('rejects a too-short query → 400', async () => {
+    expect((await SELF.fetch(`${BASE}/v1/search?q=a`)).status).toBe(400)
+  })
+
+  it('rejects a missing query → 400', async () => {
+    expect((await SELF.fetch(`${BASE}/v1/search`)).status).toBe(400)
+  })
+
+  it('honors the limit (default / clamp / cap)', async () => {
+    await seed([
+      { barcode: '6000000000010', name: 'Lim A', brand: 'L' },
+      { barcode: '6000000000011', name: 'Lim B', brand: 'L' },
+      { barcode: '6000000000012', name: 'Lim C', brand: 'L' },
+    ])
+    expect(((await (await SELF.fetch(`${BASE}/v1/search?q=lim&limit=1`)).json()) as { results: unknown[] }).results).toHaveLength(1)
+    expect((await SELF.fetch(`${BASE}/v1/search?q=lim&limit=0`)).status).toBe(200) // <=0 -> default
+    expect((await SELF.fetch(`${BASE}/v1/search?q=lim&limit=99999`)).status).toBe(200) // capped
+  })
+
+  it('lists brands with approved-product counts', async () => {
+    await seed([
+      { barcode: '6000000000020', name: 'P1', brand: 'BrandA' },
+      { barcode: '6000000000021', name: 'P2', brand: 'BrandA' },
+      { barcode: '6000000000022', name: 'P3', brand: 'BrandB' },
+    ])
+    const brands = ((await (await SELF.fetch(`${BASE}/v1/brands`)).json()) as { brands: { slug: string; product_count: number }[] }).brands
+    expect(brands.find((b) => b.slug === 'branda')?.product_count).toBe(2)
+  })
+
+  it('lists products for a brand slug', async () => {
+    await seed([{ barcode: '6000000000030', name: 'BrandProd', brand: 'MyBrand' }])
+    const body = (await (await SELF.fetch(`${BASE}/v1/brand/mybrand`)).json()) as { slug: string; results: { name: string }[] }
+    expect(body.slug).toBe('mybrand')
+    expect(body.results.some((r) => r.name === 'BrandProd')).toBe(true)
+  })
+
+  it('returns an empty list for an unknown brand slug', async () => {
+    expect(((await (await SELF.fetch(`${BASE}/v1/brand/nope-nope`)).json()) as { results: unknown[] }).results).toEqual([])
+  })
+})
+
 describe('OFF fallback (network mocked)', () => {
   beforeAll(() => {
     fetchMock.activate()
