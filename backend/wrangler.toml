@@ -14,5 +14,10 @@ migrations_dir = "migrations"
 [observability]
 enabled = true
 
+[vars]
+# Optional GEPIR resolver base URL. Empty → brand-ownership claims fall back to
+# manual admin review. Set to a proxy exposing GET {base}/gtin/{gtin} → {company_name}.
+GEPIR_BASE_URL = ""
+
 # ADMIN_KEY is a secret, not set here. Local: copy .dev.vars.example -> .dev.vars.
 # Production:  wrangler secret put ADMIN_KEY

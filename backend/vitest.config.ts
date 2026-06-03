@@ -19,6 +19,7 @@ export default defineWorkersConfig(async () => {
             bindings: {
               ADMIN_KEY: 'test-admin-key',
               JWT_SECRET: 'test-jwt-secret',
+              GEPIR_BASE_URL: 'https://gepir.test',
               TEST_MIGRATIONS: migrations,
             },
           },

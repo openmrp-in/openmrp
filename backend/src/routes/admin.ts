@@ -4,6 +4,7 @@ import { isAdmin, newOpenAPIApp, type AppEnv } from '../openapi/app'
 import {
   AdminDevelopersSchema,
   AdminKeysSchema,
+  BrandClaimsListSchema,
   EditProductSchema,
   ErrorSchema,
   GrantBrandOwnerSchema,
@@ -16,6 +17,7 @@ import {
   VersionsListSchema,
 } from '../openapi/schemas'
 import { createAccountsStore } from '../db/accounts'
+import { createClaimsStore } from '../db/claims'
 import { createD1Store, loadProduct } from '../db/queries'
 import { createRolesStore } from '../db/roles'
 import { applyProductEdit, countVersions, listVersions, revertToVersion, snapshotVersion } from '../db/versions'
@@ -283,6 +285,84 @@ app.openapi(grantBrandOwnerRoute, async (c) => {
   const now = new Date().toISOString()
   await roles.grantBrandOwner(account_id, brand_id, method, now)
   await roles.grantRole(account_id, 'brand_owner', 'admin', now)
+  return c.json({ ok: true }, 200)
+})
+
+// ─── Brand-claim review queue ────────────────────────────────────────────────
+const claimIdParam = z.object({ id: z.string().openapi({ param: { name: 'id', in: 'path' } }) })
+const claimNotFound = { content: { 'application/json': { schema: ErrorSchema } }, description: 'Claim not found' }
+const claimResolved = { content: { 'application/json': { schema: ErrorSchema } }, description: 'Already resolved' }
+
+const listClaimsRoute = createRoute({
+  method: 'get',
+  path: '/v1/admin/brand-claims',
+  tags: ['Admin'],
+  summary: 'Pending brand-ownership claims',
+  security: [{ AdminKey: [] }],
+  request: { query: z.object({ limit: limitQuery }) },
+  responses: {
+    200: { content: { 'application/json': { schema: BrandClaimsListSchema } }, description: 'OK' },
+    401: unauthorized,
+  },
+})
+
+app.openapi(listClaimsRoute, async (c) => {
+  const { limit } = c.req.valid('query')
+  const claims = await createClaimsStore(c.env.DB).listPending(clampLimit(limit, 100, 500))
+  return c.json({ claims }, 200)
+})
+
+const approveClaimRoute = createRoute({
+  method: 'post',
+  path: '/v1/admin/brand-claims/{id}/approve',
+  tags: ['Admin'],
+  summary: 'Approve a brand-ownership claim (manual grant)',
+  security: [{ AdminKey: [] }],
+  request: { params: claimIdParam },
+  responses: {
+    200: { content: { 'application/json': { schema: OkSchema } }, description: 'Approved' },
+    401: unauthorized,
+    404: claimNotFound,
+    409: claimResolved,
+  },
+})
+
+app.openapi(approveClaimRoute, async (c) => {
+  const { id } = c.req.valid('param')
+  const db = c.env.DB
+  const store = createClaimsStore(db)
+  const claim = await store.get(id)
+  if (!claim) return c.json({ error: 'not_found' }, 404)
+  const now = new Date().toISOString()
+  if (!(await store.resolve(id, 'verified', 'admin', now))) return c.json({ error: 'already_resolved' }, 409)
+  const roles = createRolesStore(db)
+  await roles.grantBrandOwner(claim.account_id, claim.brand_id, 'admin', now)
+  await roles.grantRole(claim.account_id, 'brand_owner', 'admin', now)
+  return c.json({ ok: true }, 200)
+})
+
+const rejectClaimRoute = createRoute({
+  method: 'post',
+  path: '/v1/admin/brand-claims/{id}/reject',
+  tags: ['Admin'],
+  summary: 'Reject a brand-ownership claim',
+  security: [{ AdminKey: [] }],
+  request: { params: claimIdParam },
+  responses: {
+    200: { content: { 'application/json': { schema: OkSchema } }, description: 'Rejected' },
+    401: unauthorized,
+    404: claimNotFound,
+    409: claimResolved,
+  },
+})
+
+app.openapi(rejectClaimRoute, async (c) => {
+  const { id } = c.req.valid('param')
+  const store = createClaimsStore(c.env.DB)
+  if (!(await store.get(id))) return c.json({ error: 'not_found' }, 404)
+  if (!(await store.resolve(id, 'rejected', 'admin', new Date().toISOString()))) {
+    return c.json({ error: 'already_resolved' }, 409)
+  }
   return c.json({ ok: true }, 200)
 })
 

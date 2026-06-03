@@ -414,3 +414,33 @@ export const SubmitResultSchema = z
 export const ApproveResultSchema = z
   .object({ status: z.enum(['applied', 'pending']), approvals: z.number(), version: z.number().optional() })
   .openapi('ApproveResult')
+
+// ─── Brand-ownership claims (GEPIR-verified) ─────────────────────────────────
+export const SubmitClaimSchema = z
+  .object({
+    slug: z.string().min(1).openapi({ description: 'Brand slug to claim' }),
+    gtin: z.string().min(8).openapi({ description: 'A GTIN/barcode of a product under this brand' }),
+    company: z.string().default('').openapi({ description: 'Your registered company name (matched against GEPIR)' }),
+  })
+  .openapi('SubmitClaim')
+
+export const BrandClaimSchema = z
+  .object({
+    id: z.string(),
+    account_id: z.string(),
+    brand_id: z.string(),
+    gtin: z.string(),
+    claimed_company: z.string(),
+    gepir_company: z.string(),
+    status: z.string(),
+    method: z.string(),
+    resolved_at: z.string(),
+    created_at: z.string(),
+  })
+  .openapi('BrandClaim')
+
+export const BrandClaimsListSchema = z.object({ claims: z.array(BrandClaimSchema) }).openapi('BrandClaimsList')
+
+export const SubmitClaimResultSchema = z
+  .object({ status: z.enum(['verified', 'pending']), claim_id: z.string(), gepir_company: z.string() })
+  .openapi('SubmitClaimResult')

@@ -6,4 +6,10 @@ export interface Env {
   ADMIN_KEY: string
   /** HMAC secret for signing developer session JWTs. */
   JWT_SECRET: string
+  /**
+   * Base URL of a GEPIR (GS1 party registry) resolver, e.g. a thin proxy that
+   * exposes `GET {base}/gtin/{gtin}` → `{ company_name, gln? }` (404 if unknown).
+   * When empty, brand-ownership claims fall back to manual admin review.
+   */
+  GEPIR_BASE_URL: string
 }

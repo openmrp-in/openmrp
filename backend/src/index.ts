@@ -5,6 +5,7 @@ import { newOpenAPIApp } from './openapi/app'
 import { HealthSchema } from './openapi/schemas'
 import adminApp from './routes/admin'
 import authApp from './routes/auth'
+import claimsApp from './routes/claims'
 import contributionsApp from './routes/contributions'
 import discoverApp from './routes/discover'
 import keysApp from './routes/keys'
@@ -39,6 +40,7 @@ app.route('/', discoverApp)
 app.route('/', authApp)
 app.route('/', keysApp)
 app.route('/', contributionsApp)
+app.route('/', claimsApp)
 app.route('/', adminApp)
 
 // Security schemes (documented on the relevant endpoints).
