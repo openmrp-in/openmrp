@@ -314,3 +314,41 @@ export const AdminKeySchema = z
   .openapi('AdminKey')
 
 export const AdminKeysSchema = z.object({ keys: z.array(AdminKeySchema) }).openapi('AdminKeys')
+
+// ─── Editing + versioning ────────────────────────────────────────────────────
+export const EditProductSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().default(''),
+    ingredients: z.string().default(''),
+    category: z.string().default(''),
+    food_type: z.enum(['veg', 'non-veg', 'egg', 'none']).default('none'),
+    image_url: z.string().default(''),
+    hsn_code: z.string().default(''),
+    translations: z.array(ProductTranslationInputSchema).default([]),
+  })
+  .openapi('EditProduct')
+
+export const ProductStateSchema = z
+  .object({
+    product: ProductSchema,
+    brand: BrandSchema.nullable(),
+    variants: z.array(VariantSchema),
+    translations: z.array(ProductTranslationSchema),
+    brand_translations: z.array(BrandTranslationSchema),
+  })
+  .openapi('ProductState')
+
+export const VersionMetaSchema = z
+  .object({
+    id: z.string(),
+    version: z.number(),
+    note: z.string(),
+    created_by: z.string(),
+    created_at: z.string(),
+  })
+  .openapi('VersionMeta')
+
+export const VersionsListSchema = z.object({ versions: z.array(VersionMetaSchema) }).openapi('VersionsList')
+export const RevertSchema = z.object({ version: z.number().int().positive() }).openapi('Revert')
+export const RevertedSchema = z.object({ reverted: z.boolean(), version: z.number() }).openapi('Reverted')

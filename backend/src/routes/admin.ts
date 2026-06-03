@@ -1,9 +1,23 @@
 import { createRoute, z } from '@hono/zod-openapi'
 import type { MiddlewareHandler } from 'hono'
 import { isAdmin, newOpenAPIApp, type AppEnv } from '../openapi/app'
-import { AdminDevelopersSchema, AdminKeysSchema, ErrorSchema } from '../openapi/schemas'
+import {
+  AdminDevelopersSchema,
+  AdminKeysSchema,
+  EditProductSchema,
+  ErrorSchema,
+  ProductStateSchema,
+  RevertSchema,
+  RevertedSchema,
+  VersionsListSchema,
+} from '../openapi/schemas'
 import { createAccountsStore } from '../db/accounts'
+import { createD1Store, loadProduct } from '../db/queries'
+import { applyProductEdit, countVersions, listVersions, revertToVersion, snapshotVersion } from '../db/versions'
 import { clampLimit } from '../lib/limit'
+
+const barcodeParam = z.object({ barcode: z.string().openapi({ param: { name: 'barcode', in: 'path' } }) })
+const notFound = { content: { 'application/json': { schema: ErrorSchema } }, description: 'Product not found' }
 
 const app = newOpenAPIApp()
 
@@ -77,6 +91,94 @@ app.openapi(keysRoute, async (c) => {
     },
     200,
   )
+})
+
+// ─── Product editing + versioning ────────────────────────────────────────────
+const editRoute = createRoute({
+  method: 'post',
+  path: '/v1/admin/products/{barcode}/edit',
+  tags: ['Admin'],
+  summary: 'Edit a product (full replace of fields + translations)',
+  security: [{ AdminKey: [] }],
+  request: { params: barcodeParam, body: { required: true, content: { 'application/json': { schema: EditProductSchema } } } },
+  responses: {
+    200: { content: { 'application/json': { schema: ProductStateSchema } }, description: 'Updated' },
+    401: unauthorized,
+    404: notFound,
+    422: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Validation failed' },
+  },
+})
+
+app.openapi(editRoute, async (c) => {
+  const { barcode } = c.req.valid('param')
+  const edit = c.req.valid('json')
+  const db = c.env.DB
+  const resolved = await createD1Store(db).findByBarcode(barcode)
+  if (!resolved) return c.json({ error: 'not_found' }, 404)
+  const productId = resolved.product.id
+  const now = new Date().toISOString()
+  if ((await countVersions(db, productId)) === 0) await snapshotVersion(db, productId, 'baseline', 'admin', now)
+  await applyProductEdit(db, productId, edit, now)
+  await snapshotVersion(db, productId, 'edit', 'admin', now)
+  const updated = (await loadProduct(db, productId))!
+  return c.json(
+    {
+      product: updated.product,
+      brand: updated.brand,
+      variants: updated.variants,
+      translations: updated.translations,
+      brand_translations: updated.brand_translations,
+    },
+    200,
+  )
+})
+
+const versionsRoute = createRoute({
+  method: 'get',
+  path: '/v1/admin/products/{barcode}/versions',
+  tags: ['Admin'],
+  summary: 'List a product version history',
+  security: [{ AdminKey: [] }],
+  request: { params: barcodeParam },
+  responses: {
+    200: { content: { 'application/json': { schema: VersionsListSchema } }, description: 'Versions (newest first)' },
+    401: unauthorized,
+    404: notFound,
+  },
+})
+
+app.openapi(versionsRoute, async (c) => {
+  const { barcode } = c.req.valid('param')
+  const db = c.env.DB
+  const resolved = await createD1Store(db).findByBarcode(barcode)
+  if (!resolved) return c.json({ error: 'not_found' }, 404)
+  return c.json({ versions: await listVersions(db, resolved.product.id) }, 200)
+})
+
+const revertRoute = createRoute({
+  method: 'post',
+  path: '/v1/admin/products/{barcode}/revert',
+  tags: ['Admin'],
+  summary: 'Revert a product to a previous version',
+  security: [{ AdminKey: [] }],
+  request: { params: barcodeParam, body: { required: true, content: { 'application/json': { schema: RevertSchema } } } },
+  responses: {
+    200: { content: { 'application/json': { schema: RevertedSchema } }, description: 'Reverted' },
+    401: unauthorized,
+    404: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Product or version not found' },
+    422: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Validation failed' },
+  },
+})
+
+app.openapi(revertRoute, async (c) => {
+  const { barcode } = c.req.valid('param')
+  const { version } = c.req.valid('json')
+  const db = c.env.DB
+  const resolved = await createD1Store(db).findByBarcode(barcode)
+  if (!resolved) return c.json({ error: 'not_found' }, 404)
+  const ok = await revertToVersion(db, resolved.product.id, version, 'admin', new Date().toISOString())
+  if (!ok) return c.json({ error: 'version_not_found' }, 404)
+  return c.json({ reverted: true, version }, 200)
 })
 
 export default app

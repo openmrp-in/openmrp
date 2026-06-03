@@ -9,6 +9,7 @@ import {
   ErrorSchema,
 } from '../openapi/schemas'
 import { createD1Store } from '../db/queries'
+import { snapshotVersion } from '../db/versions'
 import { mapCreateProductError } from '../lib/errors'
 import { normalizeSeedItem, type SeedItem } from '../lib/seed'
 
@@ -49,6 +50,7 @@ app.openapi(createProductRoute, async (c) => {
   const store = createD1Store(c.env.DB)
   try {
     const created = await store.createProduct(value)
+    await snapshotVersion(c.env.DB, created.product.id, 'create', 'admin', new Date().toISOString())
     return c.json(
       {
         created: true,

@@ -71,40 +71,39 @@ const CARD_SELECT = `
   WHERE p.moderation_status = 'approved'
     AND EXISTS (SELECT 1 FROM variants v WHERE v.product_id = p.id AND v.barcode <> '')`
 
+/** Load a product's full state (product + brand + variants + translations) by id. */
+export async function loadProduct(db: D1Database, productId: string): Promise<ResolvedProduct | null> {
+  const product = await db.prepare('SELECT * FROM products WHERE id = ?').bind(productId).first<ProductRow>()
+  if (!product) return null
+
+  const brand: BrandRow | null = product.brand_id
+    ? await db.prepare('SELECT * FROM brands WHERE id = ?').bind(product.brand_id).first<BrandRow>()
+    : null
+
+  const variants = await db
+    .prepare('SELECT * FROM variants WHERE product_id = ? ORDER BY pack_size')
+    .bind(productId)
+    .all<VariantRow>()
+  const translations = await db
+    .prepare('SELECT * FROM product_translations WHERE product_id = ?')
+    .bind(productId)
+    .all<ProductTranslationRow>()
+  const brandTranslations = brand
+    ? (await db.prepare('SELECT * FROM brand_translations WHERE brand_id = ?').bind(brand.id).all<BrandTranslationRow>()).results
+    : []
+
+  return {
+    product,
+    brand,
+    variants: variants.results,
+    translations: translations.results,
+    brand_translations: brandTranslations,
+  }
+}
+
 /** D1-backed implementation of ProductStore. */
 export function createD1Store(db: D1Database): ProductStore {
-  async function loadById(productId: string): Promise<ResolvedProduct | null> {
-    const product = await db
-      .prepare('SELECT * FROM products WHERE id = ?')
-      .bind(productId)
-      .first<ProductRow>()
-    /* istanbul ignore if -- @preserve: defensive; a variant's FK guarantees its product exists */
-    if (!product) return null
-
-    const brand: BrandRow | null = product.brand_id
-      ? await db.prepare('SELECT * FROM brands WHERE id = ?').bind(product.brand_id).first<BrandRow>()
-      : null
-
-    const variants = await db
-      .prepare('SELECT * FROM variants WHERE product_id = ? ORDER BY pack_size')
-      .bind(productId)
-      .all<VariantRow>()
-    const translations = await db
-      .prepare('SELECT * FROM product_translations WHERE product_id = ?')
-      .bind(productId)
-      .all<ProductTranslationRow>()
-    const brandTranslations = brand
-      ? (await db.prepare('SELECT * FROM brand_translations WHERE brand_id = ?').bind(brand.id).all<BrandTranslationRow>()).results
-      : []
-
-    return {
-      product,
-      brand,
-      variants: variants.results,
-      translations: translations.results,
-      brand_translations: brandTranslations,
-    }
-  }
+  const loadById = (productId: string) => loadProduct(db, productId)
 
   return {
     async findByBarcode(barcode: string): Promise<ResolvedProduct | null> {
