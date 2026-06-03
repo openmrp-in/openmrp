@@ -4,12 +4,13 @@ import { newOpenAPIApp } from '../openapi/app'
 import { developerAuth } from '../openapi/middleware'
 import {
   AuthResponseSchema,
-  DeveloperViewSchema,
   ErrorSchema,
   LoginSchema,
+  MeSchema,
   RegisterSchema,
 } from '../openapi/schemas'
 import { createAccountsStore } from '../db/accounts'
+import { createRolesStore } from '../db/roles'
 import { hashPassword, verifyPassword } from '../lib/password'
 import { ulid } from '../lib/ulid'
 
@@ -72,7 +73,7 @@ const meRoute = createRoute({
   summary: 'Current developer',
   security: [{ DevBearer: [] }],
   responses: {
-    200: { content: { 'application/json': { schema: DeveloperViewSchema } }, description: 'OK' },
+    200: { content: { 'application/json': { schema: MeSchema } }, description: 'OK' },
     401: jsonError('Unauthorized'),
   },
 })
@@ -81,7 +82,18 @@ app.openapi(meRoute, async (c) => {
   const dev = await createAccountsStore(c.env.DB).findDeveloperById(c.get('developerId'))
   /* istanbul ignore if -- @preserve: defensive; a valid token implies the developer exists */
   if (!dev) return c.json({ error: 'unauthorized' }, 401)
-  return c.json({ id: dev.id, email: dev.email, name: dev.name, created_at: dev.created_at }, 200)
+  const roles = createRolesStore(c.env.DB)
+  return c.json(
+    {
+      id: dev.id,
+      email: dev.email,
+      name: dev.name,
+      created_at: dev.created_at,
+      roles: await roles.listRoles(dev.id),
+      owned_brands: await roles.listOwnedBrands(dev.id),
+    },
+    200,
+  )
 })
 
 export default app

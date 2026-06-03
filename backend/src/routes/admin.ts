@@ -6,17 +6,23 @@ import {
   AdminKeysSchema,
   EditProductSchema,
   ErrorSchema,
+  GrantBrandOwnerSchema,
+  GrantRoleSchema,
+  OkSchema,
   ProductStateSchema,
   RevertSchema,
   RevertedSchema,
+  RolesListSchema,
   VersionsListSchema,
 } from '../openapi/schemas'
 import { createAccountsStore } from '../db/accounts'
 import { createD1Store, loadProduct } from '../db/queries'
+import { createRolesStore } from '../db/roles'
 import { applyProductEdit, countVersions, listVersions, revertToVersion, snapshotVersion } from '../db/versions'
 import { clampLimit } from '../lib/limit'
 
 const barcodeParam = z.object({ barcode: z.string().openapi({ param: { name: 'barcode', in: 'path' } }) })
+const accountIdParam = z.object({ id: z.string().openapi({ param: { name: 'id', in: 'path' } }) })
 const notFound = { content: { 'application/json': { schema: ErrorSchema } }, description: 'Product not found' }
 
 const app = newOpenAPIApp()
@@ -179,6 +185,105 @@ app.openapi(revertRoute, async (c) => {
   const ok = await revertToVersion(db, resolved.product.id, version, 'admin', new Date().toISOString())
   if (!ok) return c.json({ error: 'version_not_found' }, 404)
   return c.json({ reverted: true, version }, 200)
+})
+
+// ─── Roles + brand ownership ─────────────────────────────────────────────────
+const accountNotFound = { content: { 'application/json': { schema: ErrorSchema } }, description: 'Account not found' }
+
+const listRolesRoute = createRoute({
+  method: 'get',
+  path: '/v1/admin/accounts/{id}/roles',
+  tags: ['Admin'],
+  summary: "List an account's roles",
+  security: [{ AdminKey: [] }],
+  request: { params: accountIdParam },
+  responses: {
+    200: { content: { 'application/json': { schema: RolesListSchema } }, description: 'OK' },
+    401: unauthorized,
+    404: accountNotFound,
+  },
+})
+
+app.openapi(listRolesRoute, async (c) => {
+  const { id } = c.req.valid('param')
+  if (!(await createAccountsStore(c.env.DB).findDeveloperById(id))) return c.json({ error: 'not_found' }, 404)
+  return c.json({ roles: await createRolesStore(c.env.DB).listRoles(id) }, 200)
+})
+
+const grantRoleRoute = createRoute({
+  method: 'post',
+  path: '/v1/admin/accounts/{id}/roles',
+  tags: ['Admin'],
+  summary: 'Grant a role to an account',
+  security: [{ AdminKey: [] }],
+  request: { params: accountIdParam, body: { required: true, content: { 'application/json': { schema: GrantRoleSchema } } } },
+  responses: {
+    200: { content: { 'application/json': { schema: RolesListSchema } }, description: 'Updated roles' },
+    401: unauthorized,
+    404: accountNotFound,
+    422: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Validation failed' },
+  },
+})
+
+app.openapi(grantRoleRoute, async (c) => {
+  const { id } = c.req.valid('param')
+  const { role } = c.req.valid('json')
+  const roles = createRolesStore(c.env.DB)
+  if (!(await createAccountsStore(c.env.DB).findDeveloperById(id))) return c.json({ error: 'not_found' }, 404)
+  await roles.grantRole(id, role, 'admin', new Date().toISOString())
+  return c.json({ roles: await roles.listRoles(id) }, 200)
+})
+
+const revokeRoleRoute = createRoute({
+  method: 'post',
+  path: '/v1/admin/accounts/{id}/roles/revoke',
+  tags: ['Admin'],
+  summary: 'Revoke a role from an account',
+  security: [{ AdminKey: [] }],
+  request: { params: accountIdParam, body: { required: true, content: { 'application/json': { schema: GrantRoleSchema } } } },
+  responses: {
+    200: { content: { 'application/json': { schema: RolesListSchema } }, description: 'Updated roles' },
+    401: unauthorized,
+    404: accountNotFound,
+    422: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Validation failed' },
+  },
+})
+
+app.openapi(revokeRoleRoute, async (c) => {
+  const { id } = c.req.valid('param')
+  const { role } = c.req.valid('json')
+  const roles = createRolesStore(c.env.DB)
+  if (!(await createAccountsStore(c.env.DB).findDeveloperById(id))) return c.json({ error: 'not_found' }, 404)
+  await roles.revokeRole(id, role)
+  return c.json({ roles: await roles.listRoles(id) }, 200)
+})
+
+const grantBrandOwnerRoute = createRoute({
+  method: 'post',
+  path: '/v1/admin/brand-owners',
+  tags: ['Admin'],
+  summary: 'Grant verified brand ownership to an account',
+  security: [{ AdminKey: [] }],
+  request: { body: { required: true, content: { 'application/json': { schema: GrantBrandOwnerSchema } } } },
+  responses: {
+    200: { content: { 'application/json': { schema: OkSchema } }, description: 'Granted' },
+    401: unauthorized,
+    404: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Account or brand not found' },
+    422: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Validation failed' },
+  },
+})
+
+app.openapi(grantBrandOwnerRoute, async (c) => {
+  const { account_id, brand_id, method } = c.req.valid('json')
+  const db = c.env.DB
+  if (!(await createAccountsStore(db).findDeveloperById(account_id))) return c.json({ error: 'account_not_found' }, 404)
+  const brand = await db.prepare('SELECT 1 AS x FROM brands WHERE id = ?').bind(brand_id).first<{ x: number }>()
+  if (!brand) return c.json({ error: 'brand_not_found' }, 404)
+  const roles = createRolesStore(db)
+  const now = new Date().toISOString()
+  await roles.grantBrandOwner(account_id, brand_id, method, now)
+  await roles.grantRole(account_id, 'brand_owner', 'admin', now)
+  return c.json({ ok: true }, 200)
 })
 
 export default app

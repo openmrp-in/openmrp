@@ -352,3 +352,65 @@ export const VersionMetaSchema = z
 export const VersionsListSchema = z.object({ versions: z.array(VersionMetaSchema) }).openapi('VersionsList')
 export const RevertSchema = z.object({ version: z.number().int().positive() }).openapi('Revert')
 export const RevertedSchema = z.object({ reverted: z.boolean(), version: z.number() }).openapi('Reverted')
+
+// ─── Roles + brand ownership ──────────────────────────────────────────────────
+export const RoleEnum = z.enum(['contributor', 'brand_owner', 'admin'])
+
+export const OwnedBrandSchema = z
+  .object({ brand_id: z.string(), status: z.string(), method: z.string(), created_at: z.string() })
+  .openapi('OwnedBrand')
+
+/** /v1/auth/me — the account plus its roles + verified brand ownership. */
+export const MeSchema = z
+  .object({
+    id: z.string(),
+    email: z.string(),
+    name: z.string(),
+    created_at: z.string(),
+    roles: z.array(RoleEnum),
+    owned_brands: z.array(OwnedBrandSchema),
+  })
+  .openapi('Me')
+
+export const GrantRoleSchema = z.object({ role: RoleEnum }).openapi('GrantRole')
+export const RolesListSchema = z.object({ roles: z.array(RoleEnum) }).openapi('RolesList')
+export const GrantBrandOwnerSchema = z
+  .object({ account_id: z.string().min(1), brand_id: z.string().min(1), method: z.string().default('admin') })
+  .openapi('GrantBrandOwner')
+export const OkSchema = z.object({ ok: z.boolean() }).openapi('Ok')
+
+// ─── Contributions (community edits) ──────────────────────────────────────────
+export const SubmitContributionSchema = z
+  .object({ barcode: z.string().min(1), edit: EditProductSchema, note: z.string().default('') })
+  .openapi('SubmitContribution')
+
+export const ContributionSchema = z
+  .object({
+    id: z.string(),
+    account_id: z.string(),
+    product_id: z.string(),
+    kind: z.string(),
+    note: z.string(),
+    status: z.string(),
+    applied_version: z.number().nullable(),
+    approvals: z.number(),
+    created_at: z.string(),
+    resolved_at: z.string(),
+  })
+  .openapi('Contribution')
+
+export const ContributionsListSchema = z
+  .object({ contributions: z.array(ContributionSchema) })
+  .openapi('ContributionsList')
+
+export const SubmitResultSchema = z
+  .object({
+    status: z.enum(['applied', 'pending']),
+    contribution_id: z.string(),
+    version: z.number().optional(),
+  })
+  .openapi('SubmitResult')
+
+export const ApproveResultSchema = z
+  .object({ status: z.enum(['applied', 'pending']), approvals: z.number(), version: z.number().optional() })
+  .openapi('ApproveResult')
