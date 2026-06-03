@@ -1,6 +1,6 @@
 export interface ApiError {
   status: 409 | 500
-  body: Record<string, unknown>
+  body: { error: string; detail?: string }
 }
 
 /**

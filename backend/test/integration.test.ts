@@ -276,12 +276,12 @@ describe('search + browse', () => {
     expect(((await res.json()) as { results: unknown[] }).results).toEqual([])
   })
 
-  it('rejects a too-short query → 400', async () => {
-    expect((await SELF.fetch(`${BASE}/v1/search?q=a`)).status).toBe(400)
+  it('rejects a too-short query → 422', async () => {
+    expect((await SELF.fetch(`${BASE}/v1/search?q=a`)).status).toBe(422)
   })
 
-  it('rejects a missing query → 400', async () => {
-    expect((await SELF.fetch(`${BASE}/v1/search`)).status).toBe(400)
+  it('rejects a missing query → 422', async () => {
+    expect((await SELF.fetch(`${BASE}/v1/search`)).status).toBe(422)
   })
 
   it('honors the limit (default / clamp / cap)', async () => {
@@ -314,6 +314,32 @@ describe('search + browse', () => {
 
   it('returns an empty list for an unknown brand slug', async () => {
     expect(((await (await SELF.fetch(`${BASE}/v1/brand/nope-nope`)).json()) as { results: unknown[] }).results).toEqual([])
+  })
+})
+
+describe('OpenAPI docs', () => {
+  it('serves the OpenAPI spec with every route', async () => {
+    const res = await SELF.fetch(`${BASE}/openapi.json`)
+    expect(res.status).toBe(200)
+    const spec = (await res.json()) as { openapi: string; paths: Record<string, unknown> }
+    expect(spec.openapi).toMatch(/^3\./)
+    expect(Object.keys(spec.paths)).toEqual(
+      expect.arrayContaining([
+        '/health',
+        '/v1/product/{barcode}',
+        '/v1/products',
+        '/v1/products/bulk',
+        '/v1/search',
+        '/v1/brands',
+        '/v1/brand/{slug}',
+      ]),
+    )
+  })
+
+  it('serves the Scalar docs UI', async () => {
+    const res = await SELF.fetch(`${BASE}/docs`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type') ?? '').toContain('text/html')
   })
 })
 

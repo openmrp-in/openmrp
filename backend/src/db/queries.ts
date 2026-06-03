@@ -1,5 +1,5 @@
 import type { SeedItem } from '../lib/seed'
-import type { CreateProductInput } from '../lib/validate'
+import type { CreateProductInput } from '../openapi/schemas'
 import { slugify } from '../lib/slug'
 import { ulid } from '../lib/ulid'
 import type {

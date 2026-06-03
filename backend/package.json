@@ -16,6 +16,8 @@
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
+    "@hono/zod-openapi": "^1.4.0",
+    "@scalar/hono-api-reference": "^0.10.20",
     "hono": "^4.6.0"
   },
   "devDependencies": {
