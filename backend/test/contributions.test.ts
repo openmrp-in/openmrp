@@ -121,6 +121,17 @@ describe('community contributions — 2-approval engine', () => {
     expect(me.owned_brands.map((b) => b.brand_id)).toContain(brandId)
   })
 
+  it('serves current product state to a logged-in account for prefilling', async () => {
+    const alice = await register('alice@x.com')
+    const barcode = '8100000000006'
+    await createProduct(barcode)
+    const res = await SELF.fetch(`${BASE}/v1/contributions/product/${barcode}`, { headers: bearer(alice.token) })
+    expect(res.status).toBe(200)
+    expect(((await res.json()) as { product: { name: string } }).product.name).toBe('Base')
+    expect((await SELF.fetch(`${BASE}/v1/contributions/product/0000`, { headers: bearer(alice.token) })).status).toBe(404)
+    expect((await SELF.fetch(`${BASE}/v1/contributions/product/${barcode}`)).status).toBe(401)
+  })
+
   it('forbids submitting without the contributor role or brand ownership', async () => {
     const dave = await register('dave@x.com')
     const barcode = '8100000000004'

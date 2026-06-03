@@ -7,10 +7,11 @@ import {
   ContributionsListSchema,
   ErrorSchema,
   OkSchema,
+  ProductStateSchema,
   SubmitContributionSchema,
   SubmitResultSchema,
 } from '../openapi/schemas'
-import { createD1Store } from '../db/queries'
+import { createD1Store, loadProduct } from '../db/queries'
 import { createRolesStore } from '../db/roles'
 import { createContributionsStore } from '../db/contributions'
 import { clampLimit } from '../lib/limit'
@@ -70,6 +71,32 @@ app.openapi(submitRoute, async (c) => {
     new Date().toISOString(),
   )
   return c.json(result, 201)
+})
+
+// ─── Current product state (for prefilling an edit) ──────────────────────────
+const productRoute = createRoute({
+  method: 'get',
+  path: '/v1/contributions/product/{barcode}',
+  tags: ['Contributions'],
+  summary: 'Current product state, for prefilling an edit',
+  security: [{ DevBearer: [] }],
+  request: { params: z.object({ barcode: z.string().openapi({ param: { name: 'barcode', in: 'path' } }) }) },
+  responses: {
+    200: { content: { 'application/json': { schema: ProductStateSchema } }, description: 'OK' },
+    401: jsonError('Unauthorized'),
+    404: jsonError('Not found'),
+  },
+})
+
+app.openapi(productRoute, async (c) => {
+  const db = c.env.DB
+  const resolved = await createD1Store(db).findByBarcode(c.req.valid('param').barcode)
+  if (!resolved) return c.json({ error: 'not_found' }, 404)
+  const full = (await loadProduct(db, resolved.product.id))!
+  return c.json(
+    { product: full.product, brand: full.brand, variants: full.variants, translations: full.translations, brand_translations: full.brand_translations },
+    200,
+  )
 })
 
 // ─── My contributions ──────────────────────────────────────────────────────────
