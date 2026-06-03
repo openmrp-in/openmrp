@@ -22,18 +22,21 @@ test('a reviewer sees the queue and records an approval', async ({ page, request
   const reviewer = await registerApi(request, `reviewer-${stamp}@dev.com`)
   await grant(request, author.id, 'contributor')
   await grant(request, reviewer.id, 'contributor')
+  const note = `e2e-review-${stamp}`
   await createProduct(request, barcode)
   await request.post(`${API}/v1/contributions`, {
     headers: { Authorization: `Bearer ${author.token}` },
-    data: { barcode, edit: { name: 'Proposed Name' }, note: 'e2e-review-note' },
+    data: { barcode, edit: { name: 'Proposed Name' }, note },
   })
 
   await useToken(page, reviewer.token)
   await page.goto('/review')
-  await expect(page.getByText('e2e-review-note')).toBeVisible()
-  await page.locator('.approve').first().click()
+  // scope to this test's card — the review queue is global / shared across parallel tests
+  const card = page.locator('.card', { hasText: note })
+  await expect(card).toBeVisible()
+  await card.locator('.approve').click()
   // one approval of two — the item stays pending, now showing 1 / 2
-  await expect(page.getByText('1 / 2 approvals')).toBeVisible()
+  await expect(page.locator('.card', { hasText: note })).toContainText('1 / 2 approvals')
 })
 
 test('a non-reviewer is told they lack the role', async ({ page, request }) => {

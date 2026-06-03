@@ -9,9 +9,12 @@ import Base from '../../layouts/Base.astro'
 
 <script>
   import { adminApi, getAdminKey, setAdminKey, clearAdminKey, esc } from '../../client/portal'
+  import { statusChip, versionLabel, roleLabel } from '../../lib/moderation'
 
   interface Dev { id: string; email: string; name: string; key_count: number; created_at: string }
   interface Key { id: string; developer_id: string; prefix: string; name: string; request_count: number; revoked: boolean }
+  interface Claim { id: string; account_id: string; brand_id: string; gtin: string; claimed_company: string; gepir_company: string; status: string }
+  interface Version { version: number; note: string; created_by: string; created_at: string }
 
   const gate = document.getElementById('gate') as HTMLElement
   const app = document.getElementById('app') as HTMLElement
@@ -41,12 +44,13 @@ import Base from '../../layouts/Base.astro'
     const developers: Dev[] = (await devRes.json()).developers
     const keys: Key[] = (await (await adminApi('/v1/admin/keys')).json()).keys
     render(developers, keys)
+    await loadClaims()
   }
 
   function render(developers: Dev[], keys: Key[]) {
     gate.innerHTML = ''
     const devRows = developers
-      .map((d) => `<tr><td>${esc(d.email)}</td><td>${esc(d.name || '—')}</td><td>${d.key_count}</td><td>${esc(d.created_at.slice(0, 10))}</td></tr>`)
+      .map((d) => `<tr><td>${esc(d.email)}</td><td><code>${esc(d.id)}</code></td><td>${d.key_count}</td><td>${esc(d.created_at.slice(0, 10))}</td></tr>`)
       .join('')
     const keyRows = keys
       .map(
@@ -55,8 +59,28 @@ import Base from '../../layouts/Base.astro'
       .join('')
     app.innerHTML = `
       <div class="dashhead"><h1>Super-admin</h1><button id="lock" class="ghost">Lock</button></div>
+
+      <h2>Brand-ownership claims</h2>
+      <div id="claims"><p class="empty">Loading…</p></div>
+
+      <h2>Account roles</h2>
+      <div class="txrow" style="grid-template-columns:1fr 160px auto auto">
+        <input id="role-acc" placeholder="account id" />
+        <select id="role-name"><option value="contributor">Contributor</option><option value="admin">Admin</option><option value="brand_owner">Brand owner</option></select>
+        <button id="role-grant" class="primary" type="button">Grant</button>
+        <button id="role-revoke" class="ghost" type="button">Revoke</button>
+      </div>
+      <p id="role-result" class="msg"></p>
+
+      <h2>Product versions</h2>
+      <div class="txrow" style="grid-template-columns:1fr auto">
+        <input id="ver-barcode" placeholder="barcode" />
+        <button id="ver-load" class="primary" type="button">Load history</button>
+      </div>
+      <div id="versions"></div>
+
       <h2>Developers (${developers.length})</h2>
-      ${developers.length === 0 ? '<p class="empty">No developers.</p>' : `<table><thead><tr><th>Email</th><th>Name</th><th>Keys</th><th>Joined</th></tr></thead><tbody>${devRows}</tbody></table>`}
+      ${developers.length === 0 ? '<p class="empty">No developers.</p>' : `<table><thead><tr><th>Email</th><th>Account id</th><th>Keys</th><th>Joined</th></tr></thead><tbody>${devRows}</tbody></table>`}
       <h2>API keys (${keys.length})</h2>
       ${keys.length === 0 ? '<p class="empty">No keys.</p>' : `<table><thead><tr><th>Prefix</th><th>Name</th><th>Requests</th><th>Status</th></tr></thead><tbody>${keyRows}</tbody></table>`}
     `
@@ -64,6 +88,67 @@ import Base from '../../layouts/Base.astro'
       clearAdminKey()
       showGate()
     }
+    ;(document.getElementById('role-grant') as HTMLElement).onclick = () => setRole('roles')
+    ;(document.getElementById('role-revoke') as HTMLElement).onclick = () => setRole('roles/revoke')
+    ;(document.getElementById('ver-load') as HTMLElement).onclick = loadVersions
+  }
+
+  // ── Claims ─────────────────────────────────────────────────────────────────
+  async function loadClaims() {
+    const box = document.getElementById('claims') as HTMLElement
+    const claims = (await (await adminApi('/v1/admin/brand-claims')).json()).claims as Claim[]
+    box.innerHTML = claims.length === 0
+      ? '<p class="empty">No pending claims.</p>'
+      : claims
+          .map(
+            (c) => `<div class="card" style="margin-bottom:10px">
+              <p class="barcode">brand ${esc(c.brand_id)} · gtin ${esc(c.gtin)}</p>
+              <p>Claimed by <code>${esc(c.account_id)}</code> as <strong>${esc(c.claimed_company || '—')}</strong>${c.gepir_company ? ` · GEPIR said <em>${esc(c.gepir_company)}</em>` : ''}</p>
+              <div class="rowactions"><button class="primary capprove" data-id="${esc(c.id)}">Approve</button><button class="ghost creject" data-id="${esc(c.id)}">Reject</button></div>
+            </div>`,
+          )
+          .join('')
+    box.querySelectorAll<HTMLElement>('.capprove').forEach((b) => (b.onclick = () => resolveClaim(b.dataset.id as string, 'approve')))
+    box.querySelectorAll<HTMLElement>('.creject').forEach((b) => (b.onclick = () => resolveClaim(b.dataset.id as string, 'reject')))
+  }
+
+  async function resolveClaim(id: string, action: 'approve' | 'reject') {
+    await adminApi(`/v1/admin/brand-claims/${id}/${action}`, { method: 'POST' })
+    await loadClaims()
+  }
+
+  // ── Roles ──────────────────────────────────────────────────────────────────
+  async function setRole(path: string) {
+    const id = (document.getElementById('role-acc') as HTMLInputElement).value.trim()
+    const role = (document.getElementById('role-name') as HTMLSelectElement).value
+    const out = document.getElementById('role-result') as HTMLElement
+    const res = await adminApi(`/v1/admin/accounts/${encodeURIComponent(id)}/${path}`, { method: 'POST', body: JSON.stringify({ role }) })
+    if (res.status === 404) { out.className = 'msg'; out.textContent = 'No such account.'; return }
+    const roles = (await res.json()).roles as string[]
+    out.className = 'success'
+    out.textContent = roles.length ? `Roles: ${roles.map(roleLabel).join(', ')}` : 'No roles.'
+  }
+
+  // ── Versions / revert ──────────────────────────────────────────────────────
+  async function loadVersions() {
+    const barcode = (document.getElementById('ver-barcode') as HTMLInputElement).value.trim()
+    const box = document.getElementById('versions') as HTMLElement
+    if (!barcode) return
+    const res = await adminApi(`/v1/admin/products/${encodeURIComponent(barcode)}/versions`)
+    if (res.status === 404) { box.innerHTML = '<p class="notice">No product for that barcode.</p>'; return }
+    const versions = (await res.json()).versions as Version[]
+    box.innerHTML = versions.length === 0
+      ? '<p class="empty">No versions yet.</p>'
+      : `<table><thead><tr><th>Version</th><th>By</th><th>When</th><th></th></tr></thead><tbody>${versions
+          .map((v) => `<tr><td>${esc(versionLabel(v))}</td><td>${esc(v.created_by || '—')}</td><td>${esc(v.created_at.slice(0, 10))}</td><td><button class="ghost revert" data-bc="${esc(barcode)}" data-v="${v.version}">Revert</button></td></tr>`)
+          .join('')}</tbody></table>`
+    box.querySelectorAll<HTMLElement>('.revert').forEach((b) => (b.onclick = () => revert(b.dataset.bc as string, Number(b.dataset.v))))
+  }
+
+  async function revert(barcode: string, version: number) {
+    if (!confirm(`Revert ${barcode} to v${version}?`)) return
+    await adminApi(`/v1/admin/products/${encodeURIComponent(barcode)}/revert`, { method: 'POST', body: JSON.stringify({ version }) })
+    await loadVersions()
   }
 
   if (getAdminKey()) load()

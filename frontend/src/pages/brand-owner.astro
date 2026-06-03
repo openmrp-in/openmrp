@@ -1,0 +1,65 @@
+---
+import Base from '../layouts/Base.astro'
+---
+
+<Base title="Brand owner — OpenMRP" description="Claim your brand and keep its product data authoritative.">
+  <h1>Brand owner</h1>
+  <p class="muted">Claim a brand by proving you own the GS1 prefix of one of its products. Verified owners' edits to that brand apply instantly — no approvals needed.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">Claim a brand</h2>
+    <label class="field"><span>Brand slug</span><input id="slug" placeholder="parle" /></label>
+    <label class="field"><span>A GTIN/barcode under this brand</span><input id="gtin" placeholder="8901000000000" /></label>
+    <label class="field"><span>Your registered company name</span><input id="company" placeholder="Parle Products Pvt Ltd" /></label>
+    <button id="claim" class="primary">Submit claim</button>
+    <p id="result" class="msg"></p>
+  </div>
+
+  <h2>Brands you own</h2>
+  <div id="owned"><p class="empty">Loading…</p></div>
+  <h2>Your claims</h2>
+  <div id="claims"><p class="empty">Loading…</p></div>
+</Base>
+
+<script>
+  import { api, getToken } from '../client/portal'
+  import { escapeHtml, statusChip } from '../lib/moderation'
+
+  if (!getToken()) location.href = '/developers/login'
+  const owned = document.getElementById('owned') as HTMLElement
+  const claimsBox = document.getElementById('claims') as HTMLElement
+
+  async function refresh() {
+    const me = await (await api('/v1/auth/me')).json()
+    const brands = (me.owned_brands ?? []) as { brand_id: string; method: string }[]
+    owned.innerHTML = brands.length === 0
+      ? '<p class="empty">You don’t own any brands yet.</p>'
+      : `<ul class="names">${brands.map((b) => `<li><code>${escapeHtml(b.brand_id)}</code> <span class="muted">(${escapeHtml(b.method)})</span> — edit its products instantly via <a href="/contribute">Contribute</a></li>`).join('')}</ul>`
+
+    const claims = (await (await api('/v1/brand-claims/mine')).json()).claims as { id: string; brand_id: string; gtin: string; status: string }[]
+    claimsBox.innerHTML = claims.length === 0
+      ? '<p class="empty">No claims yet.</p>'
+      : `<table><thead><tr><th>Brand</th><th>GTIN</th><th>Status</th></tr></thead><tbody>${claims
+          .map((c) => `<tr><td><code>${escapeHtml(c.brand_id)}</code></td><td>${escapeHtml(c.gtin)}</td><td>${statusChip(c.status)}</td></tr>`)
+          .join('')}</tbody></table>`
+  }
+
+  async function submitClaim() {
+    const slug = (document.getElementById('slug') as HTMLInputElement).value.trim()
+    const gtin = (document.getElementById('gtin') as HTMLInputElement).value.trim()
+    const company = (document.getElementById('company') as HTMLInputElement).value.trim()
+    const out = document.getElementById('result') as HTMLElement
+    const res = await api('/v1/brand-claims', { method: 'POST', body: JSON.stringify({ slug, gtin, company }) })
+    if (res.status === 404) { out.className = 'msg'; out.textContent = 'No brand with that slug.'; return }
+    if (res.status === 422) { out.className = 'msg'; out.textContent = 'Check the slug, GTIN (min 8 digits) and company.'; return }
+    const body = (await res.json()) as { status: string }
+    out.className = 'success'
+    out.textContent = body.status === 'verified'
+      ? 'Verified — you now own this brand.'
+      : 'Submitted — pending review (GEPIR couldn’t auto-confirm).'
+    await refresh()
+  }
+
+  ;(document.getElementById('claim') as HTMLElement).onclick = submitClaim
+  refresh()
+</script>
