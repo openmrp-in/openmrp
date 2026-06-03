@@ -1,0 +1,71 @@
+---
+import Base from '../../layouts/Base.astro'
+---
+
+<Base title="Super-admin — OpenMRP" description="OpenMRP super-admin.">
+  <div id="gate"></div>
+  <div id="app"></div>
+</Base>
+
+<script>
+  import { adminApi, getAdminKey, setAdminKey, clearAdminKey, esc } from '../../client/portal'
+
+  interface Dev { id: string; email: string; name: string; key_count: number; created_at: string }
+  interface Key { id: string; developer_id: string; prefix: string; name: string; request_count: number; revoked: boolean }
+
+  const gate = document.getElementById('gate') as HTMLElement
+  const app = document.getElementById('app') as HTMLElement
+
+  function showGate(error = '') {
+    app.innerHTML = ''
+    gate.innerHTML = `
+      <h1>Super-admin</h1>
+      <form id="gateform" class="authform">
+        <input id="adminkey" type="password" placeholder="Admin key" required />
+        <button class="primary" type="submit">Open</button>
+      </form>
+      <p class="msg">${esc(error)}</p>`
+    ;(document.getElementById('gateform') as HTMLFormElement).addEventListener('submit', (e) => {
+      e.preventDefault()
+      setAdminKey((document.getElementById('adminkey') as HTMLInputElement).value)
+      load()
+    })
+  }
+
+  async function load() {
+    const devRes = await adminApi('/v1/admin/developers')
+    if (devRes.status === 401) {
+      clearAdminKey()
+      return showGate('Invalid admin key.')
+    }
+    const developers: Dev[] = (await devRes.json()).developers
+    const keys: Key[] = (await (await adminApi('/v1/admin/keys')).json()).keys
+    render(developers, keys)
+  }
+
+  function render(developers: Dev[], keys: Key[]) {
+    gate.innerHTML = ''
+    const devRows = developers
+      .map((d) => `<tr><td>${esc(d.email)}</td><td>${esc(d.name || '—')}</td><td>${d.key_count}</td><td>${esc(d.created_at.slice(0, 10))}</td></tr>`)
+      .join('')
+    const keyRows = keys
+      .map(
+        (k) => `<tr><td><code>${esc(k.prefix)}</code></td><td>${esc(k.name || '—')}</td><td>${k.request_count}</td><td>${k.revoked ? '<span class="chip non-veg">revoked</span>' : '<span class="chip veg">active</span>'}</td></tr>`,
+      )
+      .join('')
+    app.innerHTML = `
+      <div class="dashhead"><h1>Super-admin</h1><button id="lock" class="ghost">Lock</button></div>
+      <h2>Developers (${developers.length})</h2>
+      ${developers.length === 0 ? '<p class="empty">No developers.</p>' : `<table><thead><tr><th>Email</th><th>Name</th><th>Keys</th><th>Joined</th></tr></thead><tbody>${devRows}</tbody></table>`}
+      <h2>API keys (${keys.length})</h2>
+      ${keys.length === 0 ? '<p class="empty">No keys.</p>' : `<table><thead><tr><th>Prefix</th><th>Name</th><th>Requests</th><th>Status</th></tr></thead><tbody>${keyRows}</tbody></table>`}
+    `
+    ;(document.getElementById('lock') as HTMLElement).onclick = () => {
+      clearAdminKey()
+      showGate()
+    }
+  }
+
+  if (getAdminKey()) load()
+  else showGate()
+</script>

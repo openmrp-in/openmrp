@@ -19,3 +19,14 @@ export async function api(path: string, init: RequestInit = {}): Promise<Respons
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
 export const esc = (s: string): string => String(s).replace(/[&<>"]/g, (c) => ESCAPES[c])
+
+// ── Super-admin (shared X-Admin-Key, kept in sessionStorage) ─────────────────
+const ADMIN_KEY = 'omrp_admin_key'
+export const getAdminKey = (): string | null => sessionStorage.getItem(ADMIN_KEY)
+export const setAdminKey = (k: string): void => sessionStorage.setItem(ADMIN_KEY, k)
+export const clearAdminKey = (): void => sessionStorage.removeItem(ADMIN_KEY)
+
+/** Fetch an admin endpoint with the X-Admin-Key header. */
+export async function adminApi(path: string): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, { headers: { 'X-Admin-Key': getAdminKey() ?? '' } })
+}
