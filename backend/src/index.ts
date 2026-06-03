@@ -39,6 +39,11 @@ app.openAPIRegistry.registerComponent('securitySchemes', 'DevBearer', {
   scheme: 'bearer',
   bearerFormat: 'JWT',
 })
+app.openAPIRegistry.registerComponent('securitySchemes', 'ApiKey', {
+  type: 'apiKey',
+  in: 'header',
+  name: 'X-Api-Key',
+})
 
 // The spec + an interactive docs UI.
 app.doc('/openapi.json', {

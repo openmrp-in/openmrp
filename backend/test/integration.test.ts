@@ -3,6 +3,8 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 const BASE = 'https://openmrp.test'
 const ADMIN = { 'X-Admin-Key': 'test-admin-key', 'content-type': 'application/json' }
+// Fixed dev API key seeded in test/apply-migrations.ts.
+const KEY_H = { 'X-Api-Key': 'omrp_live_devkeyprefix.dev0000000000000000000000000000000000000000000000' }
 
 function productBody(barcode: string, overrides: Record<string, unknown> = {}) {
   return JSON.stringify({
@@ -65,7 +67,7 @@ describe('routes (integration, real D1)', () => {
     expect(created.variants[0].mrp_paise).toBe(4500)
     expect(created.translations[0].name).toBe('மிளகாய்')
 
-    const get = await SELF.fetch(`${BASE}/v1/product/${barcode}`)
+    const get = await SELF.fetch(`${BASE}/v1/product/${barcode}`, { headers: KEY_H })
     expect(get.status).toBe(200)
     const body = (await get.json()) as {
       found: boolean
@@ -105,7 +107,7 @@ describe('routes (integration, real D1)', () => {
     })
     expect(post.status).toBe(201)
 
-    const body = (await (await SELF.fetch(`${BASE}/v1/product/${barcode}`)).json()) as {
+    const body = (await (await SELF.fetch(`${BASE}/v1/product/${barcode}`, { headers: KEY_H })).json()) as {
       product: { description: string; ingredients: string }
       brand: { name: string; description: string } | null
       translations: { lang: string; description: string; ingredients: string }[]
@@ -262,7 +264,7 @@ describe('search + browse', () => {
       { barcode: '6000000000001', name: 'Parle G Biscuit', brand: 'Parle' },
       { barcode: '6000000000002', name: 'Marie Gold', brand: 'Britannia' },
     ])
-    const res = await SELF.fetch(`${BASE}/v1/search?q=parle`)
+    const res = await SELF.fetch(`${BASE}/v1/search?q=parle`, { headers: KEY_H })
     expect(res.status).toBe(200)
     const body = (await res.json()) as { query: string; results: { name: string; brand: string; barcode: string }[] }
     expect(body.query).toBe('parle')
@@ -272,16 +274,16 @@ describe('search + browse', () => {
 
   it('returns an empty result set for no matches', async () => {
     await seed([{ barcode: '6000000000003', name: 'Something', brand: 'X' }])
-    const res = await SELF.fetch(`${BASE}/v1/search?q=zzzznotfound`)
+    const res = await SELF.fetch(`${BASE}/v1/search?q=zzzznotfound`, { headers: KEY_H })
     expect(((await res.json()) as { results: unknown[] }).results).toEqual([])
   })
 
   it('rejects a too-short query → 422', async () => {
-    expect((await SELF.fetch(`${BASE}/v1/search?q=a`)).status).toBe(422)
+    expect((await SELF.fetch(`${BASE}/v1/search?q=a`, { headers: KEY_H })).status).toBe(422)
   })
 
   it('rejects a missing query → 422', async () => {
-    expect((await SELF.fetch(`${BASE}/v1/search`)).status).toBe(422)
+    expect((await SELF.fetch(`${BASE}/v1/search`, { headers: KEY_H })).status).toBe(422)
   })
 
   it('honors the limit (default / clamp / cap)', async () => {
@@ -290,9 +292,9 @@ describe('search + browse', () => {
       { barcode: '6000000000011', name: 'Lim B', brand: 'L' },
       { barcode: '6000000000012', name: 'Lim C', brand: 'L' },
     ])
-    expect(((await (await SELF.fetch(`${BASE}/v1/search?q=lim&limit=1`)).json()) as { results: unknown[] }).results).toHaveLength(1)
-    expect((await SELF.fetch(`${BASE}/v1/search?q=lim&limit=0`)).status).toBe(200) // <=0 -> default
-    expect((await SELF.fetch(`${BASE}/v1/search?q=lim&limit=99999`)).status).toBe(200) // capped
+    expect(((await (await SELF.fetch(`${BASE}/v1/search?q=lim&limit=1`, { headers: KEY_H })).json()) as { results: unknown[] }).results).toHaveLength(1)
+    expect((await SELF.fetch(`${BASE}/v1/search?q=lim&limit=0`, { headers: KEY_H })).status).toBe(200) // <=0 -> default
+    expect((await SELF.fetch(`${BASE}/v1/search?q=lim&limit=99999`, { headers: KEY_H })).status).toBe(200) // capped
   })
 
   it('lists brands with approved-product counts', async () => {
@@ -301,19 +303,70 @@ describe('search + browse', () => {
       { barcode: '6000000000021', name: 'P2', brand: 'BrandA' },
       { barcode: '6000000000022', name: 'P3', brand: 'BrandB' },
     ])
-    const brands = ((await (await SELF.fetch(`${BASE}/v1/brands`)).json()) as { brands: { slug: string; product_count: number }[] }).brands
+    const brands = ((await (await SELF.fetch(`${BASE}/v1/brands`, { headers: KEY_H })).json()) as { brands: { slug: string; product_count: number }[] }).brands
     expect(brands.find((b) => b.slug === 'branda')?.product_count).toBe(2)
   })
 
   it('lists products for a brand slug', async () => {
     await seed([{ barcode: '6000000000030', name: 'BrandProd', brand: 'MyBrand' }])
-    const body = (await (await SELF.fetch(`${BASE}/v1/brand/mybrand`)).json()) as { slug: string; results: { name: string }[] }
+    const body = (await (await SELF.fetch(`${BASE}/v1/brand/mybrand`, { headers: KEY_H })).json()) as { slug: string; results: { name: string }[] }
     expect(body.slug).toBe('mybrand')
     expect(body.results.some((r) => r.name === 'BrandProd')).toBe(true)
   })
 
   it('returns an empty list for an unknown brand slug', async () => {
-    expect(((await (await SELF.fetch(`${BASE}/v1/brand/nope-nope`)).json()) as { results: unknown[] }).results).toEqual([])
+    expect(((await (await SELF.fetch(`${BASE}/v1/brand/nope-nope`, { headers: KEY_H })).json()) as { results: unknown[] }).results).toEqual([])
+  })
+})
+
+describe('read gating + rate limit', () => {
+  const search = (headers?: Record<string, string>) =>
+    SELF.fetch(`${BASE}/v1/search?q=parle`, headers ? { headers } : undefined)
+
+  it('rejects a read with no API key → 401', async () => {
+    expect((await search()).status).toBe(401)
+  })
+
+  it('rejects a malformed API key → 401', async () => {
+    expect((await search({ 'X-Api-Key': 'garbage' })).status).toBe(401)
+  })
+
+  it('rejects an unknown-prefix API key → 401', async () => {
+    expect((await search({ 'X-Api-Key': 'omrp_live_unknownpfx.somesecret' })).status).toBe(401)
+  })
+
+  it('rejects a valid-prefix but wrong-secret key → 401', async () => {
+    expect((await search({ 'X-Api-Key': 'omrp_live_devkeyprefix.wrongsecret' })).status).toBe(401)
+  })
+
+  it('rejects a revoked key → 401', async () => {
+    const reg = (await (
+      await SELF.fetch(`${BASE}/v1/auth/register`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: 'rev@x.com', password: 'password123' }),
+      })
+    ).json()) as { token: string }
+    const auth = { Authorization: `Bearer ${reg.token}`, 'content-type': 'application/json' }
+    const key = (await (
+      await SELF.fetch(`${BASE}/v1/keys`, { method: 'POST', headers: auth, body: JSON.stringify({ name: 'r' }) })
+    ).json()) as { id: string; key: string }
+    await SELF.fetch(`${BASE}/v1/keys/${key.id}/revoke`, { method: 'POST', headers: auth })
+    expect((await search({ 'X-Api-Key': key.key })).status).toBe(401)
+  })
+
+  it('allows a valid key and sets RateLimit headers', async () => {
+    const res = await search({ 'X-Api-Key': 'omrp_live_devkeyprefix.dev0000000000000000000000000000000000000000000000' })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('RateLimit-Limit')).toBe('60')
+  })
+
+  it('returns 429 over the per-key limit', async () => {
+    let status = 200
+    for (let i = 0; i < 61; i++) {
+      status = (await search({ 'X-Api-Key': 'omrp_live_devkeyprefix.dev0000000000000000000000000000000000000000000000' })).status
+    }
+    expect(status).toBe(429)
   })
 })
 
@@ -361,7 +414,7 @@ describe('OFF fallback (network mocked)', () => {
           product: { product_name: 'Nutella', brands: 'Ferrero', image_url: '', quantity: '400g' },
         }),
       )
-    const res = await SELF.fetch(`${BASE}/v1/product/3017620422003`)
+    const res = await SELF.fetch(`${BASE}/v1/product/3017620422003`, { headers: KEY_H })
     expect(res.status).toBe(200)
     const body = (await res.json()) as { found: boolean; source: string; off_suggestion: { name: string } }
     expect(body).toMatchObject({ found: true, source: 'off' })
@@ -373,7 +426,7 @@ describe('OFF fallback (network mocked)', () => {
       .get('https://world.openfoodfacts.org')
       .intercept({ path: (p: string) => p.startsWith('/api/v2/product/0000000000000.json') })
       .reply(200, JSON.stringify({ status: 0 }))
-    const res = await SELF.fetch(`${BASE}/v1/product/0000000000000`)
+    const res = await SELF.fetch(`${BASE}/v1/product/0000000000000`, { headers: KEY_H })
     expect(res.status).toBe(404)
     expect(((await res.json()) as { found: boolean }).found).toBe(false)
   })

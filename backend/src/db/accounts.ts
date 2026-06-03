@@ -68,6 +68,17 @@ export function createAccountsStore(db: D1Database) {
       return rows.results
     },
 
+    findApiKeyByPrefix(prefix: string): Promise<ApiKeyRow | null> {
+      return db.prepare('SELECT * FROM api_keys WHERE prefix = ?').bind(prefix).first<ApiKeyRow>()
+    },
+
+    async recordKeyUsage(id: string, now: string): Promise<void> {
+      await db
+        .prepare('UPDATE api_keys SET request_count = request_count + 1, last_used_at = ? WHERE id = ?')
+        .bind(now, id)
+        .run()
+    },
+
     async revokeApiKey(id: string, developerId: string): Promise<boolean> {
       const res = await db
         .prepare('UPDATE api_keys SET revoked = 1 WHERE id = ? AND developer_id = ? AND revoked = 0')

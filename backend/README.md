@@ -14,16 +14,25 @@ document — they cannot drift from the implementation.
 ## Endpoints
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| GET | `/health` | — | health check |
-| GET | `/v1/product/{barcode}` | — | resolve a barcode (crowd → OFF → 404) |
-| GET | `/v1/search?q=&limit=` | — | search products by name |
-| GET | `/v1/brands?limit=` | — | list brands |
-| GET | `/v1/brand/{slug}?limit=` | — | products for a brand |
-| POST | `/v1/products` | `X-Admin-Key` | create a product (+ translations) |
-| POST | `/v1/products/bulk` | `X-Admin-Key` | bulk-upsert (seed) |
+| GET | `/health`, `/openapi.json`, `/docs` | — | health · spec · docs UI |
+| POST | `/v1/auth/register`, `/v1/auth/login` | — | developer signup / login → JWT |
+| GET | `/v1/auth/me` | Bearer JWT | current developer |
+| POST/GET | `/v1/keys`, `POST /v1/keys/{id}/revoke` | Bearer JWT | manage your API keys |
+| GET | `/v1/product/{barcode}` | `X-Api-Key` | resolve a barcode (crowd → OFF → 404) |
+| GET | `/v1/search?q=&limit=` | `X-Api-Key` | search products by name |
+| GET | `/v1/brands?limit=` | `X-Api-Key` | list brands |
+| GET | `/v1/brand/{slug}?limit=` | `X-Api-Key` | products for a brand |
+| POST | `/v1/products`, `/v1/products/bulk` | `X-Admin-Key` | create / bulk-seed products |
+| GET | `/v1/admin/developers`, `/v1/admin/keys` | `X-Admin-Key` | super-admin |
 
-Write endpoints require the `X-Admin-Key` header. Validation failures return `422`
-`{ error: "validation_failed", details: [...] }`.
+- **Reads** require a developer **`X-Api-Key`** (register → create a key). Rate-limited
+  per key (60/min) → `429` + `RateLimit-*` headers.
+- **Developer session**: `Authorization: Bearer <JWT>` from register/login.
+- **Admin / super-admin**: `X-Admin-Key`.
+- Validation failures → `422 { error: "validation_failed", details: [...] }`.
+
+Local read access: `npm run db:seed-dev-key` seeds a fixed dev key
+(`omrp_live_devkeyprefix.dev0…`) so the site/tests can call reads.
 
 ## Develop
 ```bash

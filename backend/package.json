@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "db:migrate:local": "wrangler d1 migrations apply openmrp --local",
     "db:migrate:remote": "wrangler d1 migrations apply openmrp --remote",
+    "db:seed-dev-key": "wrangler d1 execute openmrp --local --file=scripts/seed-dev-key.sql",
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {

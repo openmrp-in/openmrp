@@ -10,7 +10,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        'CI=1 npm --prefix ../backend run db:migrate:local && npm --prefix ../backend run dev -- --port 8787 --ip 127.0.0.1',
+        'CI=1 npm --prefix ../backend run db:migrate:local && CI=1 npm --prefix ../backend run db:seed-dev-key && npm --prefix ../backend run dev -- --port 8787 --ip 127.0.0.1',
       url: 'http://127.0.0.1:8787/health',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
@@ -20,6 +20,7 @@ export default defineConfig({
       url: 'http://127.0.0.1:4321',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
+      env: { OPENMRP_API_KEY: 'omrp_live_devkeyprefix.dev0000000000000000000000000000000000000000000000' },
     },
   ],
 })
