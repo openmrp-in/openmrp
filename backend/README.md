@@ -19,8 +19,8 @@ document — they cannot drift from the implementation.
 | GET | `/v1/search?q=&limit=` | — | search products by name |
 | GET | `/v1/brands?limit=` | — | list brands |
 | GET | `/v1/brand/{slug}?limit=` | — | products for a brand |
-| POST | `/v1/products` | `X-Api-Key` (admin) | create a product (+ translations) |
-| POST | `/v1/products/bulk` | `X-Api-Key` (admin) | bulk-upsert (seed) |
+| POST | `/v1/products` | `X-Admin-Key` | create a product (+ translations) |
+| POST | `/v1/products/bulk` | `X-Admin-Key` | bulk-upsert (seed) |
 
 Write endpoints require the `X-Admin-Key` header. Validation failures return `422`
 `{ error: "validation_failed", details: [...] }`.
