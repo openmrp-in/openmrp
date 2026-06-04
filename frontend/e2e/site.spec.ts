@@ -54,15 +54,17 @@ test('brand page lists its products', async ({ page }) => {
   await expect(page.getByText('E2E Test Biscuit')).toBeVisible()
 })
 
-test('product page renders the default language with a language tab', async ({ page }) => {
+test('product page renders the default language with a native-script language tab', async ({ page }) => {
   await page.goto('/p/7100000099999')
   await expect(page.getByRole('heading', { name: 'ML E2E' })).toBeVisible()
   await expect(page.getByText('English desc')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'TA' })).toBeVisible()
+  // the tab is labelled with the Tamil endonym, not the code
+  await expect(page.getByRole('link', { name: 'தமிழ்' })).toBeVisible()
 })
 
-test('product page switches to Tamil via ?lang', async ({ page }) => {
+test('product page switches to Tamil via ?lang with a provenance badge', async ({ page }) => {
   await page.goto('/p/7100000099999?lang=ta')
   await expect(page.getByRole('heading', { name: 'எம்எல்' })).toBeVisible()
-  await expect(page.getByText('தமிழ்')).toBeVisible()
+  await expect(page.locator('.desc')).toContainText('தமிழ்') // the translated description
+  await expect(page.locator('.prov')).toContainText('Translation') // provenance shown
 })

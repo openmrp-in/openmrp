@@ -41,12 +41,16 @@ export interface ProductTranslation {
   name: string
   description: string
   ingredients: string
+  source: string
+  verified: number
 }
 
 export interface BrandTranslation {
   lang: string
   name: string
   description: string
+  source: string
+  verified: number
 }
 
 export interface OffSuggestion {

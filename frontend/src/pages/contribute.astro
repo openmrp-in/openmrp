@@ -1,10 +1,14 @@
 ---
 import Base from '../layouts/Base.astro'
+import { LANGUAGES } from '../lib/languages'
 ---
 
 <Base title="Contribute — OpenMRP" description="Propose a correction or translation for a product.">
   <h1>Contribute an edit</h1>
   <p class="muted">Load a product by barcode, fix its details or add a translation, and submit. Brand owners' edits apply instantly; everyone else's apply after two approvals.</p>
+  <datalist id="langs">
+    {LANGUAGES.map((l) => <option value={l.code}>{l.endonym} — {l.name}</option>)}
+  </datalist>
   <div id="loadbar">
     <label class="field"><span>Barcode</span><input id="barcode" placeholder="8901000000000" /></label>
     <button id="load" class="primary">Load product</button>
@@ -39,7 +43,7 @@ import Base from '../layouts/Base.astro'
 
   function trRow(t: Tr): string {
     return `<div class="txrow">
-      <input class="t-lang" placeholder="hi" value="${escapeHtml(t.lang)}" />
+      <input class="t-lang" list="langs" placeholder="hi" value="${escapeHtml(t.lang)}" />
       <input class="t-name" placeholder="name" value="${escapeHtml(t.name)}" />
       <input class="t-ing" placeholder="ingredients" value="${escapeHtml(t.ingredients)}" />
       <button class="ghost t-del" type="button">✕</button>
