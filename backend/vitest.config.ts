@@ -22,6 +22,7 @@ export default defineWorkersConfig(async () => {
               GEPIR_BASE_URL: 'https://gepir.test',
               TEST_MIGRATIONS: migrations,
             },
+            r2Buckets: ['DUMP'],
           },
         },
       },

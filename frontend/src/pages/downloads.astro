@@ -1,0 +1,63 @@
+---
+import Base from '../layouts/Base.astro'
+import { getDumpManifest, dumpFileUrl, humanBytes } from '../lib/api'
+
+const manifest = await getDumpManifest()
+const generated = manifest ? new Date(manifest.generated_at).toISOString().slice(0, 10) : ''
+---
+
+<Base title="Download the dataset — OpenMRP" description="Download the full OpenMRP product dataset under the ODbL — JSON, CSV and SQL.">
+  <h1>Download the dataset</h1>
+  <p class="muted">
+    The entire OpenMRP database is free to download under the
+    <a href="https://opendatacommons.org/licenses/odbl/1-0/">Open Database License (ODbL)</a>.
+    Use it, share it, build on it — just keep derived databases open and attribute OpenMRP.
+  </p>
+
+  {
+    manifest ? (
+      <Fragment>
+        <p class="muted">
+          Generated <strong>{generated}</strong> · {manifest.total_rows.toLocaleString('en-IN')} rows · license{' '}
+          <span class="chip veg">{manifest.license}</span>
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>File</th>
+              <th>Table</th>
+              <th>Rows</th>
+              <th>Size</th>
+              <th>SHA-256</th>
+            </tr>
+          </thead>
+          <tbody>
+            {manifest.files.map((f) => (
+              <tr>
+                <td>
+                  <a href={dumpFileUrl(f.path)} download>
+                    {f.path}
+                  </a>
+                </td>
+                <td>{f.table}</td>
+                <td>{f.format === 'sql' ? '—' : f.rows.toLocaleString('en-IN')}</td>
+                <td>{humanBytes(f.bytes)}</td>
+                <td>
+                  <code title={f.sha256}>{f.sha256.slice(0, 12)}…</code>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h2>Load the SQL dump</h2>
+        <p class="muted">
+          The <code>openmrp.sql</code> file is data-only. Create the schema from the{' '}
+          <a href="https://github.com/openmrp-in/openmrp/tree/main/backend/migrations">migrations</a>, then:
+        </p>
+        <p><code>sqlite3 openmrp.db &lt; openmrp.sql</code></p>
+      </Fragment>
+    ) : (
+      <p class="notice">No dataset has been published yet — check back soon.</p>
+    )
+  }
+</Base>

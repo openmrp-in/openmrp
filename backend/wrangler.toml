@@ -14,6 +14,16 @@ migrations_dir = "migrations"
 [observability]
 enabled = true
 
+# R2 bucket holding the published ODbL data dump. Create with:
+#   wrangler r2 bucket create openmrp-dump
+[[r2_buckets]]
+binding = "DUMP"
+bucket_name = "openmrp-dump"
+
+# Weekly dump regeneration (Sundays 03:00 UTC).
+[triggers]
+crons = ["0 3 * * 0"]
+
 [vars]
 # Optional GEPIR resolver base URL. Empty → brand-ownership claims fall back to
 # manual admin review. Set to a proxy exposing GET {base}/gtin/{gtin} → {company_name}.

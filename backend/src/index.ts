@@ -8,6 +8,9 @@ import authApp from './routes/auth'
 import claimsApp from './routes/claims'
 import contributionsApp from './routes/contributions'
 import discoverApp from './routes/discover'
+import dumpApp from './routes/dump'
+import type { Env } from './env'
+import { runExport } from './dump/export'
 import keysApp from './routes/keys'
 import productApp from './routes/product'
 import productsApp from './routes/products'
@@ -41,6 +44,7 @@ app.route('/', authApp)
 app.route('/', keysApp)
 app.route('/', contributionsApp)
 app.route('/', claimsApp)
+app.route('/', dumpApp)
 app.route('/', adminApp)
 
 // Security schemes (documented on the relevant endpoints).
@@ -73,4 +77,9 @@ app.get('/docs', Scalar({ url: '/openapi.json' }))
 
 app.notFound((c) => c.json({ error: 'not_found' }, 404))
 
-export default app
+// Cron trigger (see wrangler.toml [triggers]) regenerates the open-data dump.
+const scheduled: ExportedHandlerScheduledHandler<Env> = (_event, env, ctx) => {
+  ctx.waitUntil(runExport(env.DB, env.DUMP, new Date().toISOString()))
+}
+
+export default { fetch: app.fetch, scheduled }

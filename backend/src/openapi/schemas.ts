@@ -444,3 +444,25 @@ export const BrandClaimsListSchema = z.object({ claims: z.array(BrandClaimSchema
 export const SubmitClaimResultSchema = z
   .object({ status: z.enum(['verified', 'pending']), claim_id: z.string(), gepir_company: z.string() })
   .openapi('SubmitClaimResult')
+
+// ─── Open data dump ──────────────────────────────────────────────────────────
+export const DumpFileSchema = z
+  .object({
+    path: z.string(),
+    format: z.string(),
+    table: z.string(),
+    rows: z.number(),
+    bytes: z.number(),
+    sha256: z.string(),
+  })
+  .openapi('DumpFile')
+
+export const DumpManifestSchema = z
+  .object({
+    name: z.string(),
+    license: z.string(),
+    generated_at: z.string(),
+    total_rows: z.number(),
+    files: z.array(DumpFileSchema),
+  })
+  .openapi('DumpManifest')

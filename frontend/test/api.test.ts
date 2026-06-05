@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { getProduct, search, listBrands, productsByBrand, rupees, foodTypeLabel } from '../src/lib/api'
+import {
+  getProduct,
+  search,
+  listBrands,
+  productsByBrand,
+  rupees,
+  foodTypeLabel,
+  getDumpManifest,
+  dumpFileUrl,
+  humanBytes,
+} from '../src/lib/api'
 
 function mockFetch(status: number, body: unknown) {
   return vi.fn(async () => new Response(JSON.stringify(body), { status }))
@@ -65,5 +75,26 @@ describe('productsByBrand', () => {
   it('returns [] on error', async () => {
     vi.stubGlobal('fetch', mockFetch(404, {}))
     expect(await productsByBrand('a')).toEqual([])
+  })
+})
+
+describe('dump', () => {
+  it('returns the manifest on 200 and null otherwise', async () => {
+    vi.stubGlobal('fetch', mockFetch(200, { license: 'ODbL-1.0', files: [] }))
+    expect((await getDumpManifest())?.license).toBe('ODbL-1.0')
+    vi.stubGlobal('fetch', mockFetch(404, {}))
+    expect(await getDumpManifest()).toBeNull()
+  })
+
+  it('builds a file download URL', () => {
+    expect(dumpFileUrl('products.csv')).toContain('/v1/dump/file/products.csv')
+  })
+
+  it('formats byte sizes', () => {
+    expect(humanBytes(500)).toBe('500 B')
+    expect(humanBytes(2048)).toBe('2.0 KB')
+    expect(humanBytes(5 * 1024 * 1024)).toBe('5.0 MB')
+    expect(humanBytes(3 * 1024 ** 3)).toBe('3.0 GB')
+    expect(humanBytes(5 * 1024 ** 4)).toBe('5120.0 GB') // clamps at GB
   })
 })

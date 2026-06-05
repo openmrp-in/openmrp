@@ -129,3 +129,44 @@ const FOOD_TYPE_LABELS: Record<string, string> = {
 export function foodTypeLabel(foodType: string): string {
   return FOOD_TYPE_LABELS[foodType] ?? foodType
 }
+
+// ── Open data dump (ODbL) ────────────────────────────────────────────────────
+export interface DumpFile {
+  path: string
+  format: string
+  table: string
+  rows: number
+  bytes: number
+  sha256: string
+}
+
+export interface DumpManifest {
+  name: string
+  license: string
+  generated_at: string
+  total_rows: number
+  files: DumpFile[]
+}
+
+/** The latest open-data dump manifest (public — no API key). null when none published. */
+export async function getDumpManifest(): Promise<DumpManifest | null> {
+  const res = await fetch(`${API_BASE}/v1/dump/manifest`)
+  if (!res.ok) return null
+  return (await res.json()) as DumpManifest
+}
+
+/** Absolute download URL for a published dump file. */
+export const dumpFileUrl = (name: string): string => `${API_BASE}/v1/dump/file/${name}`
+
+/** Human-readable byte size (B / KB / MB / GB). */
+export function humanBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  const units = ['KB', 'MB', 'GB']
+  let v = n / 1024
+  let i = 0
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
+  return `${v.toFixed(1)} ${units[i]}`
+}

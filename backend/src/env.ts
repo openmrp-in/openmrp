@@ -12,4 +12,6 @@ export interface Env {
    * When empty, brand-ownership claims fall back to manual admin review.
    */
   GEPIR_BASE_URL: string
+  /** R2 bucket holding the published ODbL data dump (json/csv/sql + manifest). */
+  DUMP: R2Bucket
 }
