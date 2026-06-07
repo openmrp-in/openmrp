@@ -15,6 +15,15 @@ import Base from '../layouts/Base.astro'
     <p id="result" class="msg"></p>
   </div>
 
+  <div class="card" style="margin-top:14px">
+    <h2 style="margin-top:0">Upload your catalog</h2>
+    <p class="muted">CSV with columns <code>barcode, name, mrp, pack, category, food_type</code>. Applies instantly under your brand (source=brand) — no approvals.</p>
+    <label class="field"><span>Brand slug</span><input id="cat-slug" placeholder="parle" /></label>
+    <label class="field"><span>Catalog CSV</span><input id="cat-file" type="file" accept=".csv,text/csv" /></label>
+    <button id="cat-upload" class="primary">Upload catalog</button>
+    <p id="cat-result" class="msg"></p>
+  </div>
+
   <h2>Brands you own</h2>
   <div id="owned"><p class="empty">Loading…</p></div>
   <h2>Your claims</h2>
@@ -24,6 +33,7 @@ import Base from '../layouts/Base.astro'
 <script>
   import { api, getToken } from '../client/portal'
   import { escapeHtml, statusChip } from '../lib/moderation'
+  import { parseCatalogCsv } from '../lib/catalog'
 
   if (!getToken()) location.href = '/developers/login'
   const owned = document.getElementById('owned') as HTMLElement
@@ -31,10 +41,10 @@ import Base from '../layouts/Base.astro'
 
   async function refresh() {
     const me = await (await api('/v1/auth/me')).json()
-    const brands = (me.owned_brands ?? []) as { brand_id: string; method: string }[]
+    const brands = (me.owned_brands ?? []) as { brand_id: string; slug: string; name: string; method: string }[]
     owned.innerHTML = brands.length === 0
       ? '<p class="empty">You don’t own any brands yet.</p>'
-      : `<ul class="names">${brands.map((b) => `<li><code>${escapeHtml(b.brand_id)}</code> <span class="muted">(${escapeHtml(b.method)})</span> — edit its products instantly via <a href="/contribute">Contribute</a></li>`).join('')}</ul>`
+      : `<ul class="names">${brands.map((b) => `<li><strong>${escapeHtml(b.name)}</strong> <code>${escapeHtml(b.slug)}</code> <span class="muted">(${escapeHtml(b.method)})</span> — upload a catalog above, or edit via <a href="/contribute">Contribute</a></li>`).join('')}</ul>`
 
     const claims = (await (await api('/v1/brand-claims/mine')).json()).claims as { id: string; brand_id: string; gtin: string; status: string }[]
     claimsBox.innerHTML = claims.length === 0
@@ -60,6 +70,24 @@ import Base from '../layouts/Base.astro'
     await refresh()
   }
 
+  async function uploadCatalog() {
+    const slug = (document.getElementById('cat-slug') as HTMLInputElement).value.trim()
+    const file = (document.getElementById('cat-file') as HTMLInputElement).files?.[0]
+    const out = document.getElementById('cat-result') as HTMLElement
+    if (!slug || !file) { out.className = 'msg'; out.textContent = 'Enter your brand slug and choose a CSV file.'; return }
+    let items
+    try { items = parseCatalogCsv(await file.text()) } catch (e) { out.className = 'msg'; out.textContent = (e as Error).message; return }
+    if (items.length === 0) { out.className = 'msg'; out.textContent = 'No rows found in the CSV.'; return }
+    const res = await api('/v1/brand-catalog', { method: 'POST', body: JSON.stringify({ slug, items }) })
+    if (res.status === 404) { out.className = 'msg'; out.textContent = 'No brand with that slug.'; return }
+    if (res.status === 403) { out.className = 'msg'; out.textContent = 'You are not a verified owner of that brand.'; return }
+    const b = (await res.json()) as { created: number; updated: number; priced: number; errors: unknown[] }
+    out.className = 'success'
+    out.textContent = `Done — ${b.created} created, ${b.updated} updated, ${b.priced} priced${b.errors.length ? `, ${b.errors.length} skipped` : ''}.`
+    await refresh()
+  }
+
   ;(document.getElementById('claim') as HTMLElement).onclick = submitClaim
+  ;(document.getElementById('cat-upload') as HTMLElement).onclick = uploadCatalog
   refresh()
 </script>

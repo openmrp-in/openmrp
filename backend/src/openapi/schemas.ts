@@ -359,7 +359,7 @@ export const RevertedSchema = z.object({ reverted: z.boolean(), version: z.numbe
 export const RoleEnum = z.enum(['contributor', 'brand_owner', 'admin'])
 
 export const OwnedBrandSchema = z
-  .object({ brand_id: z.string(), status: z.string(), method: z.string(), created_at: z.string() })
+  .object({ brand_id: z.string(), slug: z.string(), name: z.string(), status: z.string(), method: z.string(), created_at: z.string() })
   .openapi('OwnedBrand')
 
 /** /v1/auth/me — the account plus its roles + verified brand ownership. */
@@ -520,3 +520,28 @@ export const AdminSetPricesSchema = z
 export const AdminSetPricesResultSchema = z
   .object({ set: z.number(), missing: z.array(z.string()) })
   .openapi('AdminSetPricesResult')
+
+// ─── Brand catalog upload (verified owner) ───────────────────────────────────
+export const CatalogItemSchema = z
+  .object({
+    barcode: z.string().default(''),
+    name: z.string().default(''),
+    mrp_paise: z.number().int().positive().optional(),
+    pack: z.string().default(''),
+    category: z.string().default(''),
+    food_type: z.string().default(''),
+  })
+  .openapi('CatalogItem')
+
+export const BrandCatalogSchema = z
+  .object({ slug: z.string().min(1), items: z.array(CatalogItemSchema).min(1) })
+  .openapi('BrandCatalog')
+
+export const BrandCatalogResultSchema = z
+  .object({
+    created: z.number(),
+    updated: z.number(),
+    priced: z.number(),
+    errors: z.array(z.object({ barcode: z.string(), error: z.string() })),
+  })
+  .openapi('BrandCatalogResult')

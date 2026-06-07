@@ -4,6 +4,8 @@ export const ROLES: readonly Role[] = ['contributor', 'brand_owner', 'admin']
 
 export interface OwnedBrand {
   brand_id: string
+  slug: string
+  name: string
   status: string
   method: string
   created_at: string
@@ -63,7 +65,9 @@ export function createRolesStore(db: D1Database) {
 
     async listOwnedBrands(accountId: string): Promise<OwnedBrand[]> {
       const rows = await db
-        .prepare('SELECT brand_id, status, method, created_at FROM brand_owners WHERE account_id = ? ORDER BY created_at DESC')
+        .prepare(
+          'SELECT bo.brand_id, b.slug, b.name, bo.status, bo.method, bo.created_at FROM brand_owners bo JOIN brands b ON b.id = bo.brand_id WHERE bo.account_id = ? ORDER BY bo.created_at DESC',
+        )
         .bind(accountId)
         .all<OwnedBrand>()
       return rows.results

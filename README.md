@@ -122,7 +122,8 @@ OpenMRP is **curated-open**: anyone can propose, a small trusted team reviews.
   non-owners apply after **two independent approvals**.
 - **Contributors** — review and approve others' edits at `/review`.
 - **Brands** — claim your brand at `/brand-owner` (auto-verified via GS1 GEPIR, or by
-  manual review). Verified owners' edits apply **instantly** and authoritatively.
+  manual review), then **upload your whole catalog as a CSV** (barcode, name, MRP, pack,
+  category) — it applies **instantly** and authoritatively (`source=brand`), no approvals.
 - **Everything is versioned** — any product can be reverted to a prior stable version.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup + the PR/test bar, and
