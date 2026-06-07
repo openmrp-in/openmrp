@@ -3,17 +3,35 @@
  * Authority) publishes ceiling prices / MRPs for scheduled medicines as PUBLIC
  * GOVERNMENT DATA — a legitimate bulk source (unlike scraping a commercial site).
  *
- * Download the latest ceiling-price list from https://nppa.gov.in, save it as CSV
- * (a header row + columns for the formulation name, pack/unit, and price), then:
+ * Feed it the published ceiling-price list from https://nppa.gov.in — either the
+ * PDF directly (e.g. the Compendium of Prices / NLEM), or a CSV (header row +
+ * columns for the formulation name, pack/unit, and price):
  *
- *   npm run load-nppa -- --file nppa.csv --url http://127.0.0.1:8787 --admin-key <key>
+ *   npm run load-nppa -- --file compendium.pdf --url http://127.0.0.1:8787 --admin-key <key>
+ *   npm run load-nppa -- --file nppa.csv        --admin-key <key>
+ *
+ * The PDF parser carries the drug name across NPPA's wrapped rows and keeps only
+ * rows with an identifiable strength (skipping ambiguous ones) — verify a sample
+ * against the source before trusting it, and note the list's effective date (NPPA
+ * revises ceiling prices annually).
  *
  * Medicines carry no barcode, so each is keyed by a synthetic `nppa-…` id and is
  * name-searchable (answers "is my medicine overpriced?"). Prices are stamped
  * source='gov'. Idempotent: re-running upserts the same products + prices.
  */
 import { readFile } from 'node:fs/promises'
-import { parseNppaCsv, nppaKey } from '../src/lib/nppa'
+import { PDFParse } from 'pdf-parse'
+import { parseNppaCsv, parseNppaText, nppaKey, type NppaRow } from '../src/lib/nppa'
+
+/** Read NPPA rows from a .pdf (published ceiling-price list) or a .csv. */
+async function readRows(file: string): Promise<NppaRow[]> {
+  if (file.toLowerCase().endsWith('.pdf')) {
+    const parser = new PDFParse({ data: new Uint8Array(await readFile(file)) })
+    const { text } = await parser.getText()
+    return parseNppaText(text)
+  }
+  return parseNppaCsv(await readFile(file, 'utf8'))
+}
 
 interface Args {
   file: string
@@ -35,7 +53,7 @@ function parseArgs(argv: string[]): Args {
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2))
   const headers = { 'X-Admin-Key': args.adminKey, 'content-type': 'application/json' }
-  const rows = parseNppaCsv(await readFile(args.file, 'utf8'))
+  const rows = await readRows(args.file)
   console.log(`parsed ${rows.length} NPPA rows from ${args.file}`)
 
   // Bulk-upsert as approved, searchable, categorized products (medicines are keyed by

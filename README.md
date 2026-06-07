@@ -82,8 +82,13 @@ loader — e.g. the **NPPA** drug price list (download the published CSV from
 
 ```bash
 cd backend
-npm run load-nppa -- --file nppa.csv --admin-key <key>   # medicines, source=gov, searchable by name
+# feed it NPPA's published PDF directly (or a CSV); ~880 priced medicines from one Compendium
+npm run load-nppa -- --file compendium.pdf --admin-key <key>   # source=gov, name-searchable
 ```
+
+The PDF parser carries the drug name across NPPA's wrapped rows and keeps only rows
+with an identifiable strength — verify a sample against the source, and note the
+effective date (NPPA revises ceiling prices annually).
 
 ## API
 

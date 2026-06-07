@@ -68,3 +68,59 @@ export function parseNppaCsv(text: string): NppaRow[] {
   }
   return out
 }
+
+// ── NPPA published-PDF text parsing ──────────────────────────────────────────
+// NPPA's ceiling-price PDFs wrap rows: a price row's drug name is often on an
+// earlier line. We carry the current drug name forward and only emit rows that
+// carry an identifiable dosage STRENGTH (mg/ml/…), skipping ambiguous bare-pack
+// rows — fewer rows, but each one a properly-identified medicine + strength + price.
+
+const FORMULATION = /\b(tablet|injection|capsule|oral|syrup|solution|suspension|cream|ointment|drops|inhaler|powder|gel|liquid|spray|patch|granules|caplet|sachet|lotion|infusion|vial)\b/i
+const STRENGTH = /\d+(\.\d+)?\s?(mg|ml|mcg|%|iu|w\/v|w\/w)\b/i
+const HEADING = /^(\d+(?:\.\d+)+)\s+([A-Za-z].*)$/ // "2.1.1 Acetylsalicylic acid Tablet 300 mg …"
+const PRICE_ROW = /^(.*?)(\d+\.\d{2}) \d+\(E\) \d{2}\.\d{2}\.\d{4}/
+const SKIP = /^(section|schedule|note|national list|ceiling price|\[see|provided|page|s\.?o\.?\b)/i
+
+/** From "Morphine Injection 10 mg/ml", split the drug name (before the formulation/dose) from the rest. */
+export function drugNameFrom(rest: string): { name: string; remainder: string } {
+  const words = rest.split(/\s+/)
+  const name: string[] = []
+  let i = 0
+  for (; i < words.length; i++) {
+    if (FORMULATION.test(words[i]) || /^\d/.test(words[i])) break
+    name.push(words[i])
+  }
+  return { name: name.join(' ').trim(), remainder: words.slice(i).join(' ').trim() }
+}
+
+export function parseNppaText(text: string): NppaRow[] {
+  const lines = text.split('\n').map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
+  const out: NppaRow[] = []
+  let currentDrug = ''
+  for (const ln of lines) {
+    if (SKIP.test(ln)) continue
+    const pr = ln.match(PRICE_ROW)
+    if (!pr) {
+      const h = ln.match(HEADING) // a drug heading whose price is on a later line
+      if (h) {
+        const r = drugNameFrom(h[2])
+        if (r.name) currentDrug = r.name
+      }
+      continue
+    }
+    let desc = pr[1].trim()
+    const dh = desc.match(HEADING)
+    if (dh) {
+      const r = drugNameFrom(dh[2])
+      if (r.name) {
+        currentDrug = r.name
+        desc = r.remainder
+      }
+    }
+    if (currentDrug === '' || !STRENGTH.test(desc)) continue
+    const mrpPaise = Math.round(parseFloat(pr[2]) * 100)
+    if (mrpPaise <= 0) continue
+    out.push({ name: `${currentDrug} ${desc}`.replace(/\s+/g, ' ').trim().slice(0, 200), pack: '', mrpPaise })
+  }
+  return out
+}
