@@ -5,33 +5,43 @@ import Base from '../layouts/Base.astro'
 <Base title="Review queue — OpenMRP" description="Approve or reject pending community contributions.">
   <h1>Review queue</h1>
   <p class="muted">Two approvals from distinct accounts apply a change. You can't approve your own.</p>
-  <div id="app"><p class="empty">Loading…</p></div>
+  <h2>Edits</h2>
+  <div id="edits"><p class="empty">Loading…</p></div>
+  <h2>MRP reports</h2>
+  <div id="prices"><p class="empty">Loading…</p></div>
 </Base>
 
 <script>
   import { api, getToken } from '../client/portal'
   import { canReview, escapeHtml, approvalText } from '../lib/moderation'
 
-  const app = document.getElementById('app') as HTMLElement
+  const edits = document.getElementById('edits') as HTMLElement
+  const prices = document.getElementById('prices') as HTMLElement
   if (!getToken()) location.href = '/developers/login'
 
   interface Contribution { id: string; note: string; product_id: string; approvals: number }
+  interface PriceReport { id: string; mrp_paise: number; source: string; variant_id: string; approvals: number }
 
   async function load() {
     const me = await (await api('/v1/auth/me')).json()
     if (!canReview(me.roles)) {
-      app.innerHTML = '<p class="notice">You need the contributor or admin role to review contributions.</p>'
+      const msg = '<p class="notice">You need the contributor or admin role to review.</p>'
+      edits.innerHTML = msg; prices.innerHTML = ''
       return
     }
     const queue = (await (await api('/v1/contributions')).json()).contributions as Contribution[]
-    app.innerHTML = queue.length === 0
-      ? '<p class="empty">Nothing pending. 🎉</p>'
-      : queue.map(card).join('')
-    document.querySelectorAll<HTMLElement>('.approve').forEach((b) => (b.onclick = () => act(b.dataset.id as string, 'approve')))
-    document.querySelectorAll<HTMLElement>('.reject').forEach((b) => (b.onclick = () => act(b.dataset.id as string, 'reject')))
+    edits.innerHTML = queue.length === 0 ? '<p class="empty">Nothing pending. 🎉</p>' : queue.map(editCard).join('')
+
+    const reports = (await (await api('/v1/prices')).json()).reports as PriceReport[]
+    prices.innerHTML = reports.length === 0 ? '<p class="empty">No price reports pending.</p>' : reports.map(priceCard).join('')
+
+    document.querySelectorAll<HTMLElement>('.approve').forEach((b) => (b.onclick = () => act('contributions', b.dataset.id as string, 'approve')))
+    document.querySelectorAll<HTMLElement>('.reject').forEach((b) => (b.onclick = () => act('contributions', b.dataset.id as string, 'reject')))
+    document.querySelectorAll<HTMLElement>('.p-approve').forEach((b) => (b.onclick = () => act('prices', b.dataset.id as string, 'approve')))
+    document.querySelectorAll<HTMLElement>('.p-reject').forEach((b) => (b.onclick = () => act('prices', b.dataset.id as string, 'reject')))
   }
 
-  function card(c: Contribution): string {
+  function editCard(c: Contribution): string {
     return `<div class="card" style="margin-bottom:12px">
       <p class="barcode">product ${escapeHtml(c.product_id)}</p>
       <p>${escapeHtml(c.note || '(no note)')}</p>
@@ -43,9 +53,21 @@ import Base from '../layouts/Base.astro'
     </div>`
   }
 
-  async function act(id: string, action: 'approve' | 'reject') {
-    const res = await api(`/v1/contributions/${id}/${action}`, { method: 'POST' })
-    if (res.status === 403) { alert('You cannot ' + action + ' this contribution.'); return }
+  function priceCard(r: PriceReport): string {
+    return `<div class="card" style="margin-bottom:12px">
+      <p class="barcode">variant ${escapeHtml(r.variant_id)} · ${escapeHtml(r.source)}</p>
+      <p><strong>MRP ₹${(r.mrp_paise / 100).toFixed(2)}</strong></p>
+      <p class="muted">${approvalText(r.approvals)}</p>
+      <div class="rowactions">
+        <button class="primary p-approve" data-id="${escapeHtml(r.id)}">Approve</button>
+        <button class="ghost p-reject" data-id="${escapeHtml(r.id)}">Reject</button>
+      </div>
+    </div>`
+  }
+
+  async function act(kind: 'contributions' | 'prices', id: string, action: 'approve' | 'reject') {
+    const res = await api(`/v1/${kind}/${id}/${action}`, { method: 'POST' })
+    if (res.status === 403) { alert('You cannot ' + action + ' this item.'); return }
     await load()
   }
 

@@ -9,6 +9,7 @@ import claimsApp from './routes/claims'
 import contributionsApp from './routes/contributions'
 import discoverApp from './routes/discover'
 import dumpApp from './routes/dump'
+import pricesApp from './routes/prices'
 import type { Env } from './env'
 import { runExport } from './dump/export'
 import keysApp from './routes/keys'
@@ -45,6 +46,7 @@ app.route('/', keysApp)
 app.route('/', contributionsApp)
 app.route('/', claimsApp)
 app.route('/', dumpApp)
+app.route('/', pricesApp)
 app.route('/', adminApp)
 
 // Security schemes (documented on the relevant endpoints).

@@ -3,6 +3,7 @@ import Base from '../../layouts/Base.astro'
 import { getProduct, rupees, foodTypeLabel } from '../../lib/api'
 import { languageEndonym, fontFamilyFor, isRtl, sortLanguages } from '../../lib/languages'
 import { provenance } from '../../lib/translation'
+import { mrpSourceLabel } from '../../lib/prices'
 
 const { barcode = '' } = Astro.params
 const result = await getProduct(barcode)
@@ -110,7 +111,10 @@ const jsonLd = product
               <tr>
                 <td>{v.label || (v.pack_size ? `${v.pack_size} ${v.unit}`.trim() : '—')}</td>
                 {v.mrp_paise > 0 ? (
-                  <td class="mrp">{rupees(v.mrp_paise)}</td>
+                  <td class="mrp">
+                    {rupees(v.mrp_paise)}
+                    {v.mrp_source && <small class="src"> ({mrpSourceLabel(v.mrp_source)})</small>}
+                  </td>
                 ) : (
                   <td class="unknown">Not yet known</td>
                 )}
@@ -160,6 +164,7 @@ const jsonLd = product
   .brandline { color: #555; margin: -6px 0 10px; font-size: 15px; }
   .prov { margin: -6px 0 8px; }
   .prov .chip { font-size: 12px; }
+  td.mrp .src { color: #999; font-weight: 400; font-size: 12px; }
   .desc { color: #333; line-height: 1.55; margin: 8px 0 0; }
   .langtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 14px; }
   .langtabs a { font-size: 12px; padding: 4px 9px; border-radius: 999px; border: 1px solid #e2e2df; color: #555; text-decoration: none; background: #fff; }

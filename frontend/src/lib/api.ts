@@ -15,6 +15,7 @@ export interface Variant {
   unit: string
   barcode: string
   mrp_paise: number
+  mrp_source: string
 }
 
 export interface Product {

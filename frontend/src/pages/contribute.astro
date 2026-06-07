@@ -21,9 +21,11 @@ import { LANGUAGES } from '../lib/languages'
 <script>
   import { api, getToken } from '../client/portal'
   import { buildEditPayload, escapeHtml, statusChip, approvalText } from '../lib/moderation'
+  import { paiseFromRupees } from '../lib/prices'
 
   interface Tr { lang: string; name: string; description: string; ingredients: string }
-  interface State { product: Record<string, string>; translations: Tr[] }
+  interface Variant { barcode: string; label: string; mrp_paise: number; mrp_source: string }
+  interface State { product: Record<string, string>; translations: Tr[]; variants: Variant[] }
 
   const form = document.getElementById('form') as HTMLElement
   const mine = document.getElementById('mine') as HTMLElement
@@ -50,6 +52,27 @@ import { LANGUAGES } from '../lib/languages'
     </div>`
   }
 
+  function priceRow(v: Variant): string {
+    const now = v.mrp_paise > 0 ? ` · now ₹${(v.mrp_paise / 100).toFixed(2)}${v.mrp_source ? ` (${escapeHtml(v.mrp_source)})` : ''}` : ' · no MRP yet'
+    return `<div class="txrow" style="grid-template-columns:1fr 120px auto">
+      <span class="muted">${escapeHtml(v.label || v.barcode)}${now}</span>
+      <input class="mrp-in" data-barcode="${escapeHtml(v.barcode)}" placeholder="₹ e.g. 45" />
+      <button class="ghost mrp-report" data-barcode="${escapeHtml(v.barcode)}" type="button">Report</button>
+    </div>`
+  }
+
+  async function reportPrice(barcode: string, raw: string) {
+    const out = document.getElementById('price-result') as HTMLElement
+    const paise = paiseFromRupees(raw)
+    if (paise === null) { out.className = 'msg'; out.textContent = 'Enter a valid MRP (e.g. 45 or 45.50).'; return }
+    const res = await api('/v1/prices', { method: 'POST', body: JSON.stringify({ barcode, mrp_paise: paise, source: 'pack', note: 'from the pack' }) })
+    if (res.status === 403) { out.className = 'msg'; out.textContent = 'You need the contributor role (or brand ownership) to report MRP.'; return }
+    if (res.status === 404) { out.className = 'msg'; out.textContent = 'Barcode not found.'; return }
+    const body = (await res.json()) as { status: string }
+    out.className = 'success'
+    out.textContent = body.status === 'applied' ? 'MRP applied — thank you!' : 'MRP submitted — pending two approvals.'
+  }
+
   function renderForm(barcode: string, s: State) {
     const p = s.product
     const ft = p.food_type || 'none'
@@ -70,7 +93,17 @@ import { LANGUAGES } from '../lib/languages'
         <p><label class="field"><span>Note (optional)</span><input id="f-note" placeholder="what changed + why" /></label></p>
         <button id="submit" class="primary" data-barcode="${escapeHtml(barcode)}">Submit edit</button>
         <p id="result" class="msg"></p>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h2 style="margin-top:0">Report MRP — from the pack</h2>
+        <p class="notice">Enter the MRP <strong>printed on the physical pack</strong>. Do not copy prices from shopping sites. Brand owners apply instantly; everyone else's needs two approvals.</p>
+        ${(s.variants || []).map(priceRow).join('') || '<p class="empty">No pack variants on this product.</p>'}
+        <p id="price-result" class="msg"></p>
       </div>`
+    document.querySelectorAll<HTMLElement>('.mrp-report').forEach((b) => (b.onclick = () => {
+      const inp = document.querySelector(`.mrp-in[data-barcode="${b.dataset.barcode}"]`) as HTMLInputElement
+      reportPrice(b.dataset.barcode as string, inp.value)
+    }))
     document.getElementById('addtr')!.onclick = () => {
       const wrap = document.createElement('div')
       wrap.innerHTML = trRow({ lang: '', name: '', description: '', ingredients: '' })

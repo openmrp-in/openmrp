@@ -34,6 +34,7 @@ function makeProduct(barcode: string): ResolvedProduct {
         unit: 'g',
         barcode,
         mrp_paise: 4500,
+        mrp_source: '',
         source: 'crowd',
         moderation_status: 'approved',
         created_at: NOW,

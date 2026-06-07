@@ -23,6 +23,7 @@ export const VariantSchema = z
     unit: z.string(),
     barcode: z.string(),
     mrp_paise: z.number(),
+    mrp_source: z.string(),
     source: z.string(),
     moderation_status: z.string(),
     created_at: z.string(),
@@ -466,3 +467,36 @@ export const DumpManifestSchema = z
     files: z.array(DumpFileSchema),
   })
   .openapi('DumpManifest')
+
+// ─── MRP price reports ───────────────────────────────────────────────────────
+export const SubmitPriceSchema = z
+  .object({
+    barcode: z.string().min(1),
+    mrp_paise: z.number().int().positive().openapi({ description: 'MRP in paise (₹45.00 = 4500)' }),
+    source: z.enum(['pack', 'brand', 'other']).default('pack').openapi({ description: 'Where you read it — report it FROM THE PACK, never scraped' }),
+    note: z.string().default(''),
+  })
+  .openapi('SubmitPrice')
+
+export const PriceReportSchema = z
+  .object({
+    id: z.string(),
+    variant_id: z.string(),
+    account_id: z.string(),
+    mrp_paise: z.number(),
+    source: z.string(),
+    note: z.string(),
+    status: z.string(),
+    approvals: z.number(),
+    created_at: z.string(),
+    resolved_at: z.string(),
+  })
+  .openapi('PriceReport')
+
+export const PriceReportsListSchema = z.object({ reports: z.array(PriceReportSchema) }).openapi('PriceReportsList')
+export const SubmitPriceResultSchema = z
+  .object({ status: z.enum(['applied', 'pending']), report_id: z.string(), mrp_paise: z.number() })
+  .openapi('SubmitPriceResult')
+export const ApprovePriceResultSchema = z
+  .object({ status: z.enum(['applied', 'pending']), approvals: z.number(), mrp_paise: z.number().optional() })
+  .openapi('ApprovePriceResult')

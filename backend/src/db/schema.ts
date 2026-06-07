@@ -37,6 +37,7 @@ export interface VariantRow {
   unit: string
   barcode: string
   mrp_paise: number
+  mrp_source: string
   source: string
   moderation_status: string
   created_at: string
