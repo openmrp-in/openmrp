@@ -62,6 +62,29 @@ Each table is published as JSON and CSV, plus one combined SQL dump, with a
 `manifest.json` (per-file SHA-256 + row counts + generation date). A weekly cron
 regenerates it; no API key required to download.
 
+## Where MRP comes from (and the legal line)
+
+MRP is a **public fact** — the Legal Metrology Act mandates it be printed on every pack —
+so *reporting* it is legitimate. But the **source matters**: we only take MRP from places
+that permit it.
+
+✅ **Legal sources:** read **off the physical pack** (crowd), **brand-submitted**
+(authoritative), **government-published** (e.g. NPPA drug ceiling prices), and
+**open-licensed** datasets (ODbL/OFF). Every price is stamped with its `source`
+(`pack` / `brand` / `gov` / `off`).
+
+🚫 **Never:** scrape BigBasket / Amazon / JioMart / **GS1 DataKart** / Smart Consumer —
+that breaches their terms + database rights, no matter how slowly or "one-time" it's done.
+
+Bulk-load a legitimate source (government / brand / licensed) with the authoritative
+loader — e.g. the **NPPA** drug price list (download the published CSV from
+[nppa.gov.in](https://nppa.gov.in)):
+
+```bash
+cd backend
+npm run load-nppa -- --file nppa.csv --admin-key <key>   # medicines, source=gov, searchable by name
+```
+
 ## API
 
 A free, public, OpenAPI-documented API. **Reads require a key** (self-service, free):

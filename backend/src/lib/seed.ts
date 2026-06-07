@@ -10,6 +10,7 @@ export interface SeedItem {
   unit: string
   food_type: string
   group_key: string
+  category: string
 }
 
 const FOOD_TYPES = new Set(['veg', 'non-veg', 'egg', 'none'])
@@ -41,6 +42,7 @@ export function normalizeSeedItem(raw: unknown): SeedItem | null {
     unit: str(r.unit),
     food_type: clampFoodType(r.food_type),
     group_key: groupKey || name,
+    category: str(r.category),
   }
 }
 

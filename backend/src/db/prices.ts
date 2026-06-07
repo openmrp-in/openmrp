@@ -75,6 +75,14 @@ export function createPricesStore(db: D1Database) {
   const store = {
     findVariant,
 
+    /** Authoritative set (operator / gov / licensed data — no approval). False if the barcode is unknown. */
+    async adminSet(barcode: string, mrpPaise: number, source: string, by: string, now: string): Promise<boolean> {
+      const ref = await findVariant(barcode)
+      if (!ref) return false
+      await applyPrice(ref.variant_id, mrpPaise, source, by, now)
+      return true
+    },
+
     async submit(accountId: string, ref: VariantRef, mrpPaise: number, source: string, note: string, now: string): Promise<SubmitPrice> {
       const id = ulid()
       const ownerAuto = ref.brand_id !== null && (await roles.isVerifiedOwner(accountId, ref.brand_id))

@@ -7,6 +7,6 @@ export function paiseFromRupees(input: string): number | null {
   return paise > 0 ? paise : null
 }
 
-const SOURCE_LABEL: Record<string, string> = { pack: 'from pack', brand: 'brand', other: 'other' }
+const SOURCE_LABEL: Record<string, string> = { pack: 'from pack', brand: 'brand', gov: 'govt (NPPA)', other: 'other' }
 /** Short provenance label for a variant's MRP source ('' → no MRP reported yet). */
 export const mrpSourceLabel = (source: string): string => SOURCE_LABEL[source] ?? source

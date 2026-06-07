@@ -4,6 +4,8 @@ import { isAdmin, newOpenAPIApp, type AppEnv } from '../openapi/app'
 import {
   AdminDevelopersSchema,
   AdminKeysSchema,
+  AdminSetPricesResultSchema,
+  AdminSetPricesSchema,
   BrandClaimsListSchema,
   EditProductSchema,
   ErrorSchema,
@@ -18,6 +20,7 @@ import {
 } from '../openapi/schemas'
 import { createAccountsStore } from '../db/accounts'
 import { createClaimsStore } from '../db/claims'
+import { createPricesStore } from '../db/prices'
 import { createD1Store, loadProduct } from '../db/queries'
 import { createRolesStore } from '../db/roles'
 import { applyProductEdit, countVersions, listVersions, revertToVersion, snapshotVersion } from '../db/versions'
@@ -364,6 +367,35 @@ app.openapi(rejectClaimRoute, async (c) => {
     return c.json({ error: 'already_resolved' }, 409)
   }
   return c.json({ ok: true }, 200)
+})
+
+// ─── Authoritative bulk price set (operator: government / licensed / brand data) ──
+const setPricesRoute = createRoute({
+  method: 'post',
+  path: '/v1/admin/prices',
+  tags: ['Admin'],
+  summary: 'Authoritatively set MRPs (operator load — gov / licensed / brand data)',
+  description: 'Applies prices directly (no crowd approval). For legitimate bulk sources only — NPPA, brand catalogs, licensed data. Never scraped commercial data.',
+  security: [{ AdminKey: [] }],
+  request: { body: { required: true, content: { 'application/json': { schema: AdminSetPricesSchema } } } },
+  responses: {
+    200: { content: { 'application/json': { schema: AdminSetPricesResultSchema } }, description: 'Set' },
+    401: unauthorized,
+    422: { content: { 'application/json': { schema: ErrorSchema } }, description: 'Validation failed' },
+  },
+})
+
+app.openapi(setPricesRoute, async (c) => {
+  const { items } = c.req.valid('json')
+  const store = createPricesStore(c.env.DB)
+  const now = new Date().toISOString()
+  const missing: string[] = []
+  let set = 0
+  for (const it of items) {
+    if (await store.adminSet(it.barcode, it.mrp_paise, it.source, 'gov', now)) set++
+    else missing.push(it.barcode)
+  }
+  return c.json({ set, missing }, 200)
 })
 
 export default app

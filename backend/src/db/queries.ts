@@ -275,7 +275,7 @@ export function createD1Store(db: D1Database): ProductStore {
             .prepare(
               'INSERT INTO products (id, brand_id, name, group_key, image_url, hsn_code, category, food_type, source, moderation_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             )
-            .bind(productId, brandId, item.name, slugify(item.group_key), '', '', '', item.food_type, 'off', 'approved', now, now),
+            .bind(productId, brandId, item.name, slugify(item.group_key), '', '', item.category, item.food_type, 'off', 'approved', now, now),
           db
             .prepare(
               'INSERT INTO variants (id, product_id, label, pack_size, unit, barcode, mrp_paise, source, moderation_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',

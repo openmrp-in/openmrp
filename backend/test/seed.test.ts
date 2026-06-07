@@ -17,6 +17,7 @@ describe('normalizeSeedItem', () => {
       unit: 'g',
       food_type: 'veg',
       group_key: 'aachi-masala',
+      category: ' Spices ',
     })
     expect(n).toEqual({
       barcode: '890',
@@ -26,6 +27,7 @@ describe('normalizeSeedItem', () => {
       unit: 'g',
       food_type: 'veg',
       group_key: 'aachi-masala',
+      category: 'Spices',
     })
   })
 
@@ -38,6 +40,7 @@ describe('normalizeSeedItem', () => {
       unit: '',
       food_type: 'none',
       group_key: 'Bare',
+      category: '',
     })
   })
 

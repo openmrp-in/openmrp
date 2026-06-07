@@ -225,6 +225,7 @@ export const SeedItemSchema = z
     unit: z.string().optional(),
     food_type: z.string().optional(),
     group_key: z.string().optional(),
+    category: z.string().optional(),
   })
   .openapi('SeedItem')
 
@@ -500,3 +501,22 @@ export const SubmitPriceResultSchema = z
 export const ApprovePriceResultSchema = z
   .object({ status: z.enum(['applied', 'pending']), approvals: z.number(), mrp_paise: z.number().optional() })
   .openapi('ApprovePriceResult')
+
+// Authoritative bulk price set (operator / government / licensed data — applies directly).
+export const AdminSetPricesSchema = z
+  .object({
+    items: z
+      .array(
+        z.object({
+          barcode: z.string().min(1),
+          mrp_paise: z.number().int().positive(),
+          source: z.enum(['gov', 'brand', 'pack', 'other']).default('gov'),
+        }),
+      )
+      .min(1),
+  })
+  .openapi('AdminSetPrices')
+
+export const AdminSetPricesResultSchema = z
+  .object({ set: z.number(), missing: z.array(z.string()) })
+  .openapi('AdminSetPricesResult')

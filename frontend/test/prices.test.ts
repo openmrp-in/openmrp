@@ -22,6 +22,7 @@ describe('mrpSourceLabel', () => {
   it('labels known sources and passes unknowns through', () => {
     expect(mrpSourceLabel('pack')).toBe('from pack')
     expect(mrpSourceLabel('brand')).toBe('brand')
+    expect(mrpSourceLabel('gov')).toBe('govt (NPPA)')
     expect(mrpSourceLabel('other')).toBe('other')
     expect(mrpSourceLabel('weird')).toBe('weird')
   })

@@ -106,3 +106,24 @@ describe('MRP price reports — 2-approval engine', () => {
     expect((await SELF.fetch(`${BASE}/v1/prices/no-such`, { headers: bearer(alice.token) })).status).toBe(404)
   })
 })
+
+describe('admin authoritative price set (operator / gov load)', () => {
+  it('sets MRPs directly, reporting unknown barcodes', async () => {
+    const barcode = '7700000000010'
+    await createProduct(barcode)
+    const res = await SELF.fetch(`${BASE}/v1/admin/prices`, {
+      method: 'POST',
+      headers: ADMIN,
+      body: JSON.stringify({ items: [{ barcode, mrp_paise: 3299, source: 'gov' }, { barcode: 'unknown-bc', mrp_paise: 100 }] }),
+    })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ set: 1, missing: ['unknown-bc'] })
+    expect(await variantMrp(barcode)).toMatchObject({ mrp_paise: 3299, mrp_source: 'gov' })
+  })
+
+  it('requires the admin key and a valid payload', async () => {
+    expect((await SELF.fetch(`${BASE}/v1/admin/prices`, { method: 'POST', headers: J, body: JSON.stringify({ items: [{ barcode: 'x', mrp_paise: 1 }] }) })).status).toBe(401)
+    expect((await SELF.fetch(`${BASE}/v1/admin/prices`, { method: 'POST', headers: ADMIN, body: JSON.stringify({ items: [] }) })).status).toBe(422)
+    expect((await SELF.fetch(`${BASE}/v1/admin/prices`, { method: 'POST', headers: ADMIN, body: JSON.stringify({ items: [{ barcode: 'x', mrp_paise: 0 }] }) })).status).toBe(422)
+  })
+})
