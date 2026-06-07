@@ -44,7 +44,7 @@ export function normalizeSeedItem(raw: unknown): SeedItem | null {
   }
 }
 
-/** Shape of an item in the .off-cache page files (CliqBill seeder output). */
+/** The PascalCase OFF page item shape produced by mapOffProduct (offsearch.ts). */
 export interface CacheItem {
   Barcode?: string
   Name?: string

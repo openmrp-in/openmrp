@@ -44,9 +44,34 @@ machine translation seeds the gaps (always clearly marked as auto-translated).
 
 ## Open data
 
-The dataset is published under the **Open Database License (ODbL 1.0)** — free to use,
-share, and build on, with attribution and share-alike. Periodic open data dumps are
-published openly (which also satisfies ODbL's share-alike obligation by design).
+The whole dataset is published under the **Open Database License (ODbL 1.0)** — free to
+use, share, and build on, with attribution and share-alike. Periodic dumps are published
+openly (which also satisfies ODbL's share-alike obligation by design).
+
+**Download it** at [openmrp.in/downloads](https://openmrp.in/downloads), or via the
+public API:
+
+```bash
+curl https://api.openmrp.in/v1/dump/manifest               # files + row counts + sha256
+curl -O https://api.openmrp.in/v1/dump/file/products.csv   # per-table CSV
+curl -O https://api.openmrp.in/v1/dump/file/openmrp.sql    # full SQL dump
+sqlite3 openmrp.db < openmrp.sql                           # load it (schema from migrations)
+```
+
+Each table is published as JSON and CSV, plus one combined SQL dump, with a
+`manifest.json` (per-file SHA-256 + row counts + generation date). A weekly cron
+regenerates it; no API key required to download.
+
+## API
+
+A free, public, OpenAPI-documented API. **Reads require a key** (self-service, free):
+register at [openmrp.in/developers](https://openmrp.in/developers) → create a key →
+send it as `X-Api-Key`. Interactive docs at `/docs`, spec at `/openapi.json`.
+
+```bash
+curl "https://api.openmrp.in/v1/product/8901058000610" -H "x-api-key: omrp_live_…"
+curl "https://api.openmrp.in/v1/search?q=biscuit"       -H "x-api-key: omrp_live_…"
+```
 
 ## Licensing
 
@@ -61,32 +86,58 @@ OpenMRP is openly licensed, in three layers:
 The ODbL data license is **irrevocable** — the data is, and always will be, open. See
 [GOVERNANCE.md](GOVERNANCE.md).
 
-## Contributing
+## How edits work
 
-- **Brands** — register to manage your own products and their 22-language names.
-  _(Onboarding flow: coming soon.)_
-- **Maintainers** — a small trusted team reviews community contributions. See
-  [GOVERNANCE.md](GOVERNANCE.md).
-- **Everyone** — suggest a product, correct a detail, or flag a wrong MRP.
+OpenMRP is **curated-open**: anyone can propose, a small trusted team reviews.
+
+- **Everyone** — suggest a product or correct a detail at `/contribute`. Changes from
+  non-owners apply after **two independent approvals**.
+- **Contributors** — review and approve others' edits at `/review`.
+- **Brands** — claim your brand at `/brand-owner` (auto-verified via GS1 GEPIR, or by
+  manual review). Verified owners' edits apply **instantly** and authoritatively.
+- **Everything is versioned** — any product can be reverted to a prior stable version.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup + the PR/test bar, and
+[GOVERNANCE.md](GOVERNANCE.md) for the trust model.
+
+## Run it locally
+
+```bash
+# backend (Worker + local D1)  →  http://127.0.0.1:8787
+cd backend && npm ci && npm run db:migrate:local && npm run db:seed-dev-key && npm run dev
+npm run seed -- --limit 200       # pull 200 products from Open Food Facts (separate shell)
+
+# frontend (Astro)  →  http://127.0.0.1:4321
+cd frontend && npm ci && npm run dev
+```
+
+Tests: `npm test` (both folders) — **100% coverage** is enforced on the backend and on
+the frontend's `src/lib`; `npm run test:e2e` (frontend) drives Playwright against a real
+backend. Deploying? See **[DEPLOY.md](DEPLOY.md)**.
 
 ## Repository structure
 
 ```
 openmrp/
-├── backend/    # API — Cloudflare Workers + D1 (TypeScript). Barcode resolve + write API.
-├── frontend/   # Public site — Cloudflare Pages (Next.js/Astro). Coming soon.
-└── dump/       # ODbL open-data exports (JSONL/CSV) + tooling. Coming soon.
+├── backend/    # API — Cloudflare Worker + D1 + R2 (TypeScript, Hono, code-first OpenAPI).
+│               # Resolve/search, accounts + API keys, moderation (versions, contributions,
+│               # GEPIR claims), and the ODbL dump pipeline (D1 → R2, weekly cron).
+├── frontend/   # Public site + portal — Astro on Cloudflare Pages. Browse, contribute,
+│               # review, brand-owner, super-admin, and the dataset download page.
+└── dump/       # Open-data dataset documentation (the export itself is produced by the
+                # backend into R2 and served at /v1/dump/*).
 ```
 
-Each folder is an independent project with its own `package.json`. See each folder's
-README for status and details.
+Each folder is an independent project with its own `package.json`.
 
 ## Status
 
-🚧 **Early / pre-build.** Identity and design are set; the platform is being built.
-Planned architecture: Cloudflare Workers + D1 + R2 + Pages (TypeScript), with the open
-dataset versioned here on GitHub. The `backend/` Phase 0 core (barcode resolve + admin
-write + OFF fallback) is the first slice.
+✅ **Built and tested, pre-launch.** The backend (resolve/search + accounts + the full
+moderation system: versioning, 2-approval contributions, GEPIR brand claims) and the
+frontend (public site, contributor/brand-owner/admin portals, 22-language rendering, and
+the open-data download page) are complete, with 100% test coverage and a green Playwright
+suite. Next: the production Cloudflare deploy at `openmrp.in` (see [DEPLOY.md](DEPLOY.md))
+and a real GS1 GEPIR proxy for brand auto-verification.
 
 ## Governance & stewardship
 

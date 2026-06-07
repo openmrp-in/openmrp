@@ -1,22 +1,17 @@
 /**
- * Seed OpenMRP with India product FACTS (no MRP, no images).
+ * Seed OpenMRP with India product FACTS (no MRP, no images) live from Open Food Facts.
  *
- * Two sources — OpenMRP is self-sufficient (no external repo needed):
- *   --source off    fetch live from Open Food Facts (default)
- *   --source cache  read pre-fetched page-*.json files from --cache <dir>
+ * Run against a running backend (local or production) — the seeder POSTs to the
+ * Worker's admin bulk endpoint, so it works the same against any deployment:
  *
- * Run the backend first (`npm run dev`), then e.g.:
- *   npm run seed -- --source off --url http://127.0.0.1:8787 \
- *     --admin-key local-dev-admin-key-change-me --page-size 100 --delay 1000 \
- *     --limit 0 --cache-out .off-cache
- *   npm run seed -- --source cache --cache ../../.off-cache ...
+ *   npm run seed -- --url http://127.0.0.1:8787 \
+ *     --admin-key local-dev-admin-key-change-me --page-size 100 --delay 1000 --limit 0
  *
+ * Production: point --url at the deployed Worker and pass the production admin key.
  * Idempotent: re-runs refresh source='off' rows and skip shop-improved ones.
  * --limit 0 = everything; a positive value caps it (handy for a smoke test).
  */
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { cacheItemToSeedItem, type CacheItem } from '../src/lib/seed'
+import { cacheItemToSeedItem } from '../src/lib/seed'
 import {
   buildSearchUrl,
   mapOffProduct,
@@ -26,9 +21,6 @@ import {
 } from '../src/lib/offsearch'
 
 interface Args {
-  source: 'off' | 'cache'
-  cache: string
-  cacheOut: string
   url: string
   adminKey: string
   batch: number
@@ -43,9 +35,6 @@ function parseArgs(argv: string[]): Args {
     return i >= 0 && argv[i + 1] ? argv[i + 1] : def
   }
   return {
-    source: get('--source', 'off') === 'cache' ? 'cache' : 'off',
-    cache: get('--cache', '../../.off-cache'),
-    cacheOut: get('--cache-out', ''),
     url: get('--url', 'http://127.0.0.1:8787'),
     adminKey: get('--admin-key', 'local-dev-admin-key-change-me'),
     batch: Number(get('--batch', '200')),
@@ -74,21 +63,8 @@ async function postBatch(args: Args, items: Record<string, unknown>[]): Promise<
   return (await res.json()) as BulkResponse
 }
 
-/** push returns false once the --limit cap is reached, signalling producers to stop. */
+/** push returns false once the --limit cap is reached, signalling the producer to stop. */
 type Push = (item: Record<string, unknown>) => Promise<boolean>
-
-async function seedFromCache(args: Args, push: Push): Promise<void> {
-  const files = (await readdir(args.cache))
-    .filter((f) => f.startsWith('page-') && f.endsWith('.json'))
-    .sort()
-  console.log(`seeding from ${files.length} cache pages at ${args.cache}`)
-  for (const file of files) {
-    const page = JSON.parse(await readFile(join(args.cache, file), 'utf8')) as { items?: CacheItem[] }
-    for (const raw of page.items ?? []) {
-      if (!(await push(cacheItemToSeedItem(raw)))) return
-    }
-  }
-}
 
 // OFF intermittently returns 503 / HTML rate-limit pages; retry with backoff.
 async function fetchOffPage(args: Args, page: number): Promise<OffSearchResponse> {
@@ -110,17 +86,11 @@ async function fetchOffPage(args: Args, page: number): Promise<OffSearchResponse
 
 async function seedFromOff(args: Args, push: Push): Promise<void> {
   console.log('seeding live from Open Food Facts (India)…')
-  if (args.cacheOut) await mkdir(args.cacheOut, { recursive: true })
   for (let page = 1; ; page++) {
     const data = await fetchOffPage(args, page)
     const products = data.products ?? []
     if (products.length === 0) break
-
-    const items = products.map(mapOffProduct)
-    if (args.cacheOut) {
-      await writeFile(join(args.cacheOut, `page-${page}.json`), JSON.stringify({ items, total: data.count ?? 0 }))
-    }
-    for (const item of items) {
+    for (const item of products.map(mapOffProduct)) {
       if (validBarcode(item.Barcode ?? '')) {
         if (!(await push(cacheItemToSeedItem(item)))) return
       }
@@ -155,8 +125,7 @@ async function main(): Promise<void> {
     return !(args.limit > 0 && seen >= args.limit)
   }
 
-  if (args.source === 'off') await seedFromOff(args, push)
-  else await seedFromCache(args, push)
+  await seedFromOff(args, push)
   await flush()
 
   console.log(
