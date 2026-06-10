@@ -7,6 +7,10 @@ describe('paiseFromRupees', () => {
     expect(paiseFromRupees('45.5')).toBe(4550)
     expect(paiseFromRupees('45.50')).toBe(4550)
     expect(paiseFromRupees('₹1,200')).toBe(120000)
+    expect(paiseFromRupees('₹ 1,200.50')).toBe(120050)
+    expect(paiseFromRupees('₹1,23,456')).toBe(12345600)
+    expect(paiseFromRupees('Rs. 45')).toBe(4500)
+    expect(paiseFromRupees('INR 1,23,456.75')).toBe(12345675)
     expect(paiseFromRupees('  12 ')).toBe(1200)
   })
   it('rejects invalid or non-positive inputs', () => {
@@ -15,6 +19,10 @@ describe('paiseFromRupees', () => {
     expect(paiseFromRupees('')).toBeNull()
     expect(paiseFromRupees('45.999')).toBeNull() // 3 decimals
     expect(paiseFromRupees('-5')).toBeNull()
+    expect(paiseFromRupees('1 2')).toBeNull()
+    expect(paiseFromRupees('12,34')).toBeNull()
+    expect(paiseFromRupees('₹₹12')).toBeNull()
+    expect(paiseFromRupees('Rs. ₹12')).toBeNull()
   })
 })
 
